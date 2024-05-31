@@ -188,6 +188,10 @@ than building it.
             continue;
         }
 
+        if target.contains("moturus") {
+            continue;
+        }
+
         // skip check for cross-targets
         if skip_target_sanity && target != &build.build {
             continue;

@@ -40,6 +40,9 @@ cfg_if::cfg_if! {
     } else if #[cfg(target_os = "hermit")] {
         #[path = "hermit.rs"]
         mod real_imp;
+    } else if #[cfg(target_os = "moturus")] {
+        #[path = "hermit.rs"]
+        mod real_imp;
     } else if #[cfg(target_os = "l4re")] {
         // L4Re is unix family but does not yet support unwinding.
         #[path = "dummy.rs"]

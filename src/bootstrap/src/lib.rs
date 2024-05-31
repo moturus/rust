@@ -94,6 +94,7 @@ const EXTRA_CHECK_CFGS: &[(Option<Mode>, &str, Option<&[&'static str]>)] = &[
     (Some(Mode::Std), "no_sync", None),
     /* Extra values not defined in the built-in targets yet, but used in std */
     (Some(Mode::Std), "target_env", Some(&["libnx", "p2"])),
+    (Some(Mode::Std), "target_os", Some(&["moturus"])),
     (Some(Mode::Std), "target_os", Some(&["visionos"])),
     (Some(Mode::Std), "target_arch", Some(&["arm64ec", "spirv", "nvptx", "xtensa"])),
     (Some(Mode::ToolStd), "target_os", Some(&["visionos"])),
