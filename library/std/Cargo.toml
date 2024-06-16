@@ -49,6 +49,9 @@ dlmalloc = { version = "0.2.4", features = ['rustc-dep-of-std'] }
 [target.x86_64-fortanix-unknown-sgx.dependencies]
 fortanix-sgx-abi = { version = "0.5.0", features = ['rustc-dep-of-std'], public = true }
 
+[target.'cfg(target_os = "moturus")'.dependencies]
+moto-runtime = { path = "../../../motor-os/src/lib/moto-runtime", features = ['rustc-dep-of-std'] }
+
 [target.'cfg(target_os = "hermit")'.dependencies]
 hermit-abi = { version = "0.4.0", features = ['rustc-dep-of-std'], public = true }
 

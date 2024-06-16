@@ -1436,6 +1436,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "frusa"
+version = "0.1.2"
+dependencies = [
+ "compiler_builtins",
+ "rustc-std-workspace-core",
+]
+
+[[package]]
 name = "fs-err"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2555,6 +2563,37 @@ dependencies = [
 [[package]]
 name = "miropt-test-tools"
 version = "0.1.0"
+
+[[package]]
+name = "moto-ipc"
+version = "0.2.5"
+dependencies = [
+ "compiler_builtins",
+ "moto-sys",
+ "rustc-std-workspace-alloc",
+ "rustc-std-workspace-core",
+]
+
+[[package]]
+name = "moto-runtime"
+version = "0.2.9"
+dependencies = [
+ "compiler_builtins",
+ "frusa",
+ "moto-ipc",
+ "moto-sys",
+ "rustc-std-workspace-alloc",
+ "rustc-std-workspace-core",
+]
+
+[[package]]
+name = "moto-sys"
+version = "0.2.4"
+dependencies = [
+ "compiler_builtins",
+ "rustc-std-workspace-alloc",
+ "rustc-std-workspace-core",
+]
 
 [[package]]
 name = "new_debug_unreachable"
@@ -5354,6 +5393,7 @@ dependencies = [
  "hermit-abi 0.4.0",
  "libc",
  "miniz_oxide",
+ "moto-runtime",
  "object 0.36.0",
  "panic_abort",
  "panic_unwind",

@@ -5,6 +5,7 @@ pub(crate) mod avr_gnu;
 pub(crate) mod bpf;
 pub(crate) mod dragonfly;
 pub(crate) mod freebsd;
+pub(crate) mod moturus;
 pub(crate) mod fuchsia;
 pub(crate) mod haiku;
 pub(crate) mod hermit;

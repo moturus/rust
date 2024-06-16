@@ -26,6 +26,11 @@ cfg_if::cfg_if! {
         fn rust_eh_personality() {
             core::intrinsics::abort()
         }
+    } else if #[cfg(target_os = "moturus")] {
+        #[lang = "eh_personality"]
+        fn rust_eh_personality() {
+            core::intrinsics::abort()
+        }
     } else if #[cfg(any(
         all(target_family = "windows", target_env = "gnu"),
         target_os = "psp",

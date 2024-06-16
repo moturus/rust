@@ -30,6 +30,7 @@ fn main() {
         || target_os == "windows"
         || target_os == "fuchsia"
         || (target_vendor == "fortanix" && target_env == "sgx")
+        || target_os == "moturus"
         || target_os == "hermit"
         || target_os == "l4re"
         || target_os == "redox"
