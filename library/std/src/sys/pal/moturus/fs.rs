@@ -9,37 +9,37 @@ use crate::sys::unsupported;
 use super::map_moturus_error;
 
 pub struct File {
-    inner: moto_runtime::fs::File
+    inner: moto_runtime::fs::File,
 }
 
 pub struct FileAttr {
-    inner: moto_runtime::fs::FileAttr
+    inner: moto_runtime::fs::FileAttr,
 }
 
 pub struct ReadDir {
-    inner: moto_runtime::fs::ReadDir
+    inner: moto_runtime::fs::ReadDir,
 }
 
 pub struct DirEntry {
-    inner: moto_runtime::fs::DirEntry
+    inner: moto_runtime::fs::DirEntry,
 }
 
 #[derive(Clone, Debug)]
 pub struct OpenOptions {
-    inner: moto_runtime::fs::OpenOptions
+    inner: moto_runtime::fs::OpenOptions,
 }
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct FileTimes {
-    inner: moto_runtime::fs::FileTimes
+    inner: moto_runtime::fs::FileTimes,
 }
 
 pub struct FilePermissions {
-    inner: moto_runtime::fs::FilePermissions
+    inner: moto_runtime::fs::FilePermissions,
 }
 
 pub struct FileType {
-    inner: moto_runtime::fs::FileType
+    inner: moto_runtime::fs::FileType,
 }
 
 impl FileAttr {
@@ -48,7 +48,7 @@ impl FileAttr {
     }
 
     pub fn perm(&self) -> FilePermissions {
-        FilePermissions{ inner: self.inner.perm() }
+        FilePermissions { inner: self.inner.perm() }
     }
 
     pub fn file_type(&self) -> FileType {
@@ -56,18 +56,24 @@ impl FileAttr {
     }
 
     pub fn modified(&self) -> io::Result<SystemTime> {
-        self.inner.modified().map(|ts| ->
-            SystemTime { SystemTime::from_unix_ts(ts) }).map_err(map_moturus_error)
+        self.inner
+            .modified()
+            .map(|ts| -> SystemTime { SystemTime::from_unix_ts(ts) })
+            .map_err(map_moturus_error)
     }
 
     pub fn accessed(&self) -> io::Result<SystemTime> {
-        self.inner.accessed().map(|ts| ->
-            SystemTime { SystemTime::from_unix_ts(ts) }).map_err(map_moturus_error)
+        self.inner
+            .accessed()
+            .map(|ts| -> SystemTime { SystemTime::from_unix_ts(ts) })
+            .map_err(map_moturus_error)
     }
 
     pub fn created(&self) -> io::Result<SystemTime> {
-        self.inner.created().map(|ts| ->
-            SystemTime { SystemTime::from_unix_ts(ts) }).map_err(map_moturus_error)
+        self.inner
+            .created()
+            .map(|ts| -> SystemTime { SystemTime::from_unix_ts(ts) })
+            .map_err(map_moturus_error)
     }
 }
 
@@ -175,8 +181,7 @@ impl Iterator for ReadDir {
         }
 
         let res = unsafe { res.unwrap_unchecked() };
-        Some(res.map(|inner| -> DirEntry { DirEntry { inner: inner } }).
-            map_err(map_moturus_error))
+        Some(res.map(|inner| -> DirEntry { DirEntry { inner: inner } }).map_err(map_moturus_error))
     }
 }
 
@@ -190,19 +195,23 @@ impl DirEntry {
     }
 
     pub fn metadata(&self) -> io::Result<FileAttr> {
-        self.inner.metadata().map(|inner| ->
-            FileAttr { FileAttr{inner: inner} }).map_err(map_moturus_error)
+        self.inner
+            .metadata()
+            .map(|inner| -> FileAttr { FileAttr { inner: inner } })
+            .map_err(map_moturus_error)
     }
 
     pub fn file_type(&self) -> io::Result<FileType> {
-        self.inner.file_type().map(|inner| ->
-            FileType { FileType{inner: inner} }).map_err(map_moturus_error)
+        self.inner
+            .file_type()
+            .map(|inner| -> FileType { FileType { inner: inner } })
+            .map_err(map_moturus_error)
     }
 }
 
 impl OpenOptions {
     pub fn new() -> OpenOptions {
-        OpenOptions {inner: moto_runtime::fs::OpenOptions::new() }
+        OpenOptions { inner: moto_runtime::fs::OpenOptions::new() }
     }
 
     pub fn read(&mut self, read: bool) {
@@ -236,13 +245,16 @@ impl File {
         if path_str.is_none() {
             return Err(io::Error::from(io::ErrorKind::InvalidFilename));
         }
-        moto_runtime::fs::File::open(path_str.unwrap(), &opts.inner).
-            map(|inner| { Self{inner} }).map_err(map_moturus_error)
+        moto_runtime::fs::File::open(path_str.unwrap(), &opts.inner)
+            .map(|inner| Self { inner })
+            .map_err(map_moturus_error)
     }
 
     pub fn file_attr(&self) -> io::Result<FileAttr> {
-        self.inner.file_attr().map(|inner| ->
-            FileAttr { FileAttr{inner: inner} }).map_err(map_moturus_error)
+        self.inner
+            .file_attr()
+            .map(|inner| -> FileAttr { FileAttr { inner: inner } })
+            .map_err(map_moturus_error)
     }
 
     pub fn fsync(&self) -> io::Result<()> {
@@ -261,8 +273,8 @@ impl File {
         self.inner.read(buf).map_err(map_moturus_error)
     }
 
-    pub fn read_vectored(&self, _bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        unsupported()
+    pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        crate::io::default_read_vectored(|b| self.read(b), bufs)
     }
 
     pub fn is_read_vectored(&self) -> bool {
@@ -277,8 +289,8 @@ impl File {
         self.inner.write(buf).map_err(map_moturus_error)
     }
 
-    pub fn write_vectored(&self, _bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        unsupported()
+    pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        crate::io::default_write_vectored(|b| self.write(b), bufs)
     }
 
     pub fn is_write_vectored(&self) -> bool {
@@ -313,14 +325,12 @@ impl File {
 
 #[derive(Debug)]
 pub struct DirBuilder {
-    inner: moto_runtime::fs::DirBuilder
+    inner: moto_runtime::fs::DirBuilder,
 }
 
 impl DirBuilder {
     pub fn new() -> DirBuilder {
-        DirBuilder {
-            inner: moto_runtime::fs::DirBuilder::new()
-        }
+        DirBuilder { inner: moto_runtime::fs::DirBuilder::new() }
     }
 
     pub fn mkdir(&self, p: &Path) -> io::Result<()> {
@@ -340,8 +350,9 @@ impl fmt::Debug for File {
 
 pub fn readdir(path: &Path) -> io::Result<ReadDir> {
     if let Some(pathname) = path.to_str() {
-        moto_runtime::fs::readdir(pathname).map(|inner| ->
-            ReadDir { ReadDir{inner: inner} }).map_err(map_moturus_error)
+        moto_runtime::fs::readdir(pathname)
+            .map(|inner| -> ReadDir { ReadDir { inner: inner } })
+            .map_err(map_moturus_error)
     } else {
         Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
     }
@@ -358,8 +369,7 @@ pub fn unlink(p: &Path) -> io::Result<()> {
 pub fn rename(old: &Path, new: &Path) -> io::Result<()> {
     if let Some(old_path) = old.to_str() {
         if let Some(new_path) = new.to_str() {
-            return moto_runtime::fs::rename(old_path, new_path).
-                map_err(map_moturus_error);
+            return moto_runtime::fs::rename(old_path, new_path).map_err(map_moturus_error);
         }
     }
 
@@ -408,8 +418,9 @@ pub fn link(_src: &Path, _dst: &Path) -> io::Result<()> {
 
 pub fn stat(p: &Path) -> io::Result<FileAttr> {
     if let Some(path) = p.to_str() {
-        moto_runtime::fs::stat(path).map(|inner| ->
-            FileAttr { FileAttr{inner: inner} }).map_err(map_moturus_error)
+        moto_runtime::fs::stat(path)
+            .map(|inner| -> FileAttr { FileAttr { inner: inner } })
+            .map_err(map_moturus_error)
     } else {
         Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
     }
@@ -417,8 +428,9 @@ pub fn stat(p: &Path) -> io::Result<FileAttr> {
 
 pub fn lstat(p: &Path) -> io::Result<FileAttr> {
     if let Some(path) = p.to_str() {
-        moto_runtime::fs::lstat(path).map(|inner| ->
-            FileAttr { FileAttr{inner: inner} }).map_err(map_moturus_error)
+        moto_runtime::fs::lstat(path)
+            .map(|inner| -> FileAttr { FileAttr { inner: inner } })
+            .map_err(map_moturus_error)
     } else {
         Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
     }
@@ -426,8 +438,9 @@ pub fn lstat(p: &Path) -> io::Result<FileAttr> {
 
 pub fn canonicalize(p: &Path) -> io::Result<PathBuf> {
     if let Some(path) = p.to_str() {
-        moto_runtime::fs::canonicalize(path).map(|s| ->
-            PathBuf { s.into() }).map_err(map_moturus_error)
+        moto_runtime::fs::canonicalize(path)
+            .map(|s| -> PathBuf { s.into() })
+            .map_err(map_moturus_error)
     } else {
         Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
     }

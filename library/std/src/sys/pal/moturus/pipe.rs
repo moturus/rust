@@ -10,7 +10,6 @@ pub struct AnonPipe {
 }
 
 impl AnonPipe {
-
     pub fn new(pipe_rt: moto_runtime::sync_pipe::Pipe) -> Self {
         Self { pipe_rt: crate::sync::Mutex::new(pipe_rt) }
     }
@@ -23,8 +22,8 @@ impl AnonPipe {
         unsupported()
     }
 
-    pub fn read_vectored(&self, _bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        unsupported()
+    pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        crate::io::default_read_vectored(|b| self.read(b), bufs)
     }
 
     pub fn is_read_vectored(&self) -> bool {
@@ -35,8 +34,8 @@ impl AnonPipe {
         self.pipe_rt.lock().unwrap().write(buf).map_err(map_moturus_error)
     }
 
-    pub fn write_vectored(&self, _bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        unsupported()
+    pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        crate::io::default_write_vectored(|b| self.write(b), bufs)
     }
 
     pub fn is_write_vectored(&self) -> bool {

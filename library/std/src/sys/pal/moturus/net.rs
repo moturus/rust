@@ -1,27 +1,28 @@
 use crate::fmt;
 use crate::io::{self, BorrowedCursor, IoSlice, IoSliceMut};
 use crate::net::{Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr};
-use crate::sys::unsupported;
 use crate::time::Duration;
 
 use super::map_moturus_error;
 
 pub struct TcpStream {
-    inner: moto_runtime::net::TcpStream
+    inner: moto_runtime::net::TcpStream,
 }
 
 impl TcpStream {
     pub fn connect(addr: io::Result<&SocketAddr>) -> io::Result<TcpStream> {
         match addr {
             Ok(addr) => moto_runtime::net::TcpStream::connect(addr)
-                .map(|inner| Self{inner}).map_err(map_moturus_error),
+                .map(|inner| Self { inner })
+                .map_err(map_moturus_error),
             Err(err) => Err(err),
         }
     }
 
     pub fn connect_timeout(addr: &SocketAddr, timeout: Duration) -> io::Result<TcpStream> {
         moto_runtime::net::TcpStream::connect_timeout(addr, timeout)
-            .map(|inner| Self{inner}).map_err(map_moturus_error)
+            .map(|inner| Self { inner })
+            .map_err(map_moturus_error)
     }
 
     pub fn set_read_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
@@ -52,8 +53,8 @@ impl TcpStream {
         crate::io::default_read_buf(|buf| self.read(buf), cursor)
     }
 
-    pub fn read_vectored(&self, _: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        unsupported()
+    pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        crate::io::default_read_vectored(|b| self.read(b), bufs)
     }
 
     pub fn is_read_vectored(&self) -> bool {
@@ -64,8 +65,8 @@ impl TcpStream {
         self.inner.write(buf).map_err(map_moturus_error)
     }
 
-    pub fn write_vectored(&self, _: &[IoSlice<'_>]) -> io::Result<usize> {
-        unsupported()
+    pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        crate::io::default_write_vectored(|b| self.write(b), bufs)
     }
 
     pub fn is_write_vectored(&self) -> bool {
@@ -89,7 +90,7 @@ impl TcpStream {
     }
 
     pub fn duplicate(&self) -> io::Result<TcpStream> {
-        self.inner.duplicate().map(|inner| Self{inner}).map_err(map_moturus_error)
+        self.inner.duplicate().map(|inner| Self { inner }).map_err(map_moturus_error)
     }
 
     pub fn set_linger(&self, linger: Option<Duration>) -> io::Result<()> {
@@ -132,14 +133,15 @@ impl fmt::Debug for TcpStream {
 }
 
 pub struct TcpListener {
-    inner: moto_runtime::net::TcpListener
+    inner: moto_runtime::net::TcpListener,
 }
 
 impl TcpListener {
     pub fn bind(addr: io::Result<&SocketAddr>) -> io::Result<TcpListener> {
         match addr {
             Ok(addr) => moto_runtime::net::TcpListener::bind(addr)
-                .map(|inner| Self{inner}).map_err(map_moturus_error),
+                .map(|inner| Self { inner })
+                .map_err(map_moturus_error),
             Err(err) => Err(err),
         }
     }
@@ -149,11 +151,14 @@ impl TcpListener {
     }
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        self.inner.accept().map(|(inner, addr)| (TcpStream{inner}, addr)).map_err(map_moturus_error)
+        self.inner
+            .accept()
+            .map(|(inner, addr)| (TcpStream { inner }, addr))
+            .map_err(map_moturus_error)
     }
 
     pub fn duplicate(&self) -> io::Result<TcpListener> {
-        self.inner.duplicate().map(|inner| Self{inner}).map_err(map_moturus_error)
+        self.inner.duplicate().map(|inner| Self { inner }).map_err(map_moturus_error)
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
@@ -188,14 +193,15 @@ impl fmt::Debug for TcpListener {
 }
 
 pub struct UdpSocket {
-    inner: moto_runtime::net::UdpSocket
+    inner: moto_runtime::net::UdpSocket,
 }
 
 impl UdpSocket {
     pub fn bind(addr: io::Result<&SocketAddr>) -> io::Result<UdpSocket> {
         match addr {
             Ok(addr) => moto_runtime::net::UdpSocket::bind(addr)
-                .map(|inner| Self{inner}).map_err(map_moturus_error),
+                .map(|inner| Self { inner })
+                .map_err(map_moturus_error),
             Err(err) => Err(err),
         }
     }
@@ -221,7 +227,7 @@ impl UdpSocket {
     }
 
     pub fn duplicate(&self) -> io::Result<UdpSocket> {
-        self.inner.duplicate().map(|inner| Self{inner}).map_err(map_moturus_error)
+        self.inner.duplicate().map(|inner| Self { inner }).map_err(map_moturus_error)
     }
 
     pub fn set_read_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
@@ -335,7 +341,7 @@ impl fmt::Debug for UdpSocket {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub struct LookupHost {
-    inner: moto_runtime::net::LookupHost
+    inner: moto_runtime::net::LookupHost,
 }
 
 impl LookupHost {
@@ -355,7 +361,8 @@ impl TryFrom<&str> for LookupHost {
     type Error = io::Error;
 
     fn try_from(v: &str) -> io::Result<LookupHost> {
-        moto_runtime::net::LookupHost::try_from(v).map(|inner| Self { inner })
+        moto_runtime::net::LookupHost::try_from(v)
+            .map(|inner| Self { inner })
             .map_err(map_moturus_error)
     }
 }
@@ -364,7 +371,8 @@ impl<'a> TryFrom<(&'a str, u16)> for LookupHost {
     type Error = io::Error;
 
     fn try_from(v: (&'a str, u16)) -> io::Result<LookupHost> {
-        moto_runtime::net::LookupHost::try_from(v).map(|inner| Self { inner })
+        moto_runtime::net::LookupHost::try_from(v)
+            .map(|inner| Self { inner })
             .map_err(map_moturus_error)
     }
 }
