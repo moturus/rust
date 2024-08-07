@@ -7,6 +7,8 @@ cfg_if::cfg_if! {
     } else if #[cfg(windows)] {
         mod windows;
         pub use windows::{AnonPipe, pipe};
+    } else if #[cfg(target_os = "moturus")] {
+        pub use crate::sys::pipe::{AnonPipe, pipe};
     } else {
         mod unsupported;
         pub use unsupported::{AnonPipe, pipe};

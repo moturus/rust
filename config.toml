@@ -1,0 +1,16 @@
+# Includes one of the default files in src/bootstrap/defaults
+# profile = "library"
+
+change-id = 124501
+
+profile = "user"
+
+[build]
+host = ["x86_64-unknown-linux-gnu"]
+target = ["x86_64-unknown-linux-gnu", "x86_64-unknown-moturus"]
+
+[rust]
+incremental = true
+# debug = true
+# debuginfo-level = 2
+

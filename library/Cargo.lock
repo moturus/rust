@@ -98,6 +98,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "frusa"
+version = "0.1.2"
+dependencies = [
+ "compiler_builtins",
+ "rustc-std-workspace-core",
+]
+
+[[package]]
 name = "getopts"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -179,6 +187,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8a240ddb74feaf34a79a7add65a741f3167852fba007066dcac1ca548d89c08"
 dependencies = [
  "adler",
+ "compiler_builtins",
+ "rustc-std-workspace-alloc",
+ "rustc-std-workspace-core",
+]
+
+[[package]]
+name = "moto-ipc"
+version = "0.2.5"
+dependencies = [
+ "compiler_builtins",
+ "moto-sys",
+ "rustc-std-workspace-alloc",
+ "rustc-std-workspace-core",
+]
+
+[[package]]
+name = "moto-runtime"
+version = "0.2.9"
+dependencies = [
+ "compiler_builtins",
+ "frusa",
+ "moto-ipc",
+ "moto-sys",
+ "rustc-std-workspace-alloc",
+ "rustc-std-workspace-core",
+]
+
+[[package]]
+name = "moto-sys"
+version = "0.2.4"
+dependencies = [
  "compiler_builtins",
  "rustc-std-workspace-alloc",
  "rustc-std-workspace-core",
@@ -327,6 +366,7 @@ dependencies = [
  "hermit-abi",
  "libc",
  "miniz_oxide",
+ "moto-runtime",
  "object",
  "panic_abort",
  "panic_unwind",

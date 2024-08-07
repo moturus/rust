@@ -6,6 +6,7 @@ cfg_if::cfg_if! {
         target_os = "freebsd",
         target_os = "openbsd",
         target_os = "dragonfly",
+        target_os = "moturus",
         target_os = "fuchsia",
         all(target_family = "wasm", target_feature = "atomics"),
         target_os = "hermit",
