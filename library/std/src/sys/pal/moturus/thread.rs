@@ -1,9 +1,8 @@
+use super::map_moturus_error;
 use crate::ffi::CStr;
 use crate::io;
 use crate::num::NonZeroUsize;
 use crate::time::Duration;
-
-use super::map_moturus_error;
 pub const DEFAULT_MIN_STACK_SIZE: usize = 1024 * 256;
 
 pub struct Thread {
@@ -23,8 +22,11 @@ impl Thread {
         moto_runtime::SysCpu::sched_yield();
     }
 
-    pub fn set_name(_name: &CStr) {
-        // nope
+    pub fn set_name(name: &CStr) {
+        let bytes = name.to_bytes();
+        if let Ok(s) = core::str::from_utf8(bytes) {
+            let _ = moto_runtime::set_current_thread_name(s);
+        }
     }
 
     pub fn sleep(dur: Duration) {
