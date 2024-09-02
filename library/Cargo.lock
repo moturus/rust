@@ -98,14 +98,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "frusa"
-version = "0.1.2"
-dependencies = [
- "compiler_builtins",
- "rustc-std-workspace-core",
-]
-
-[[package]]
 name = "getopts"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -203,12 +195,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "moto-rt"
+version = "0.1.0"
+dependencies = [
+ "compiler_builtins",
+ "rustc-std-workspace-core",
+]
+
+[[package]]
 name = "moto-runtime"
 version = "0.2.9"
 dependencies = [
  "compiler_builtins",
- "frusa",
  "moto-ipc",
+ "moto-rt",
  "moto-sys",
  "rustc-std-workspace-alloc",
  "rustc-std-workspace-core",
@@ -366,6 +366,7 @@ dependencies = [
  "hermit-abi",
  "libc",
  "miniz_oxide",
+ "moto-rt",
  "moto-runtime",
  "object",
  "panic_abort",
