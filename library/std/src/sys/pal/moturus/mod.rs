@@ -16,25 +16,24 @@ pub mod time;
 pub use moto_runtime::futex;
 
 pub mod pipe {
+    pub use super::io_pipe::{read2, IoPipe as AnonPipe};
     use crate::io;
     use crate::pipe::{PipeReader, PipeWriter};
     use crate::process::Stdio;
-    pub use super::io_pipe::read2;
-    pub use super::io_pipe::IoPipe as AnonPipe;
 
-#[inline]
+    #[inline]
     pub fn pipe() -> io::Result<(AnonPipe, AnonPipe)> {
         Err(io::Error::UNSUPPORTED_PLATFORM)
     }
 
-#[unstable(feature = "anonymous_pipe", issue = "127154")]
+    #[unstable(feature = "anonymous_pipe", issue = "127154")]
     impl From<PipeReader> for Stdio {
         fn from(_pipe: PipeReader) -> Self {
             todo!()
         }
     }
 
-#[unstable(feature = "anonymous_pipe", issue = "127154")]
+    #[unstable(feature = "anonymous_pipe", issue = "127154")]
     impl From<PipeWriter> for Stdio {
         fn from(_pipe: PipeWriter) -> Self {
             todo!()
@@ -49,7 +48,9 @@ pub use common::*;
 #[no_mangle]
 pub extern "C" fn moturus_start() -> ! {
     moto_runtime::moturus_start_rt();
-    extern "C" { fn main(_: isize, _: *const *const u8, _: u8) -> i32; }
+    extern "C" {
+        fn main(_: isize, _: *const *const u8, _: u8) -> i32;
+    }
     let result = unsafe { main(0, core::ptr::null(), 0) };
     moto_runtime::sys_exit(result as u64);
 }
@@ -63,19 +64,20 @@ pub extern "C" fn __rust_abort() {
     moto_runtime::sys_exit(u64::MAX)
 }
 
-pub fn map_moturus_error(err: moto_runtime::ErrorCode) -> crate::io::Error {
+pub fn map_moturus_error(err: moto_rt::ErrorCode) -> crate::io::Error {
+    use moto_rt::error::*;
+
     use crate::io::ErrorKind;
-    use moto_runtime::ErrorCode;
 
     let kind: ErrorKind = match err {
-        ErrorCode::AlreadyInUse => ErrorKind::AlreadyExists,
-        ErrorCode::InvalidFilename => ErrorKind::InvalidFilename,
-        ErrorCode::NotFound => ErrorKind::NotFound,
-        ErrorCode::TimedOut => ErrorKind::TimedOut,
-        ErrorCode::NotImplemented => ErrorKind::Unsupported,
-        ErrorCode::FileTooLarge => ErrorKind::FileTooLarge,
-        ErrorCode::UnexpectedEof => ErrorKind::UnexpectedEof,
-        _ => ErrorKind::Other
+        E_ALREADY_IN_USE => ErrorKind::AlreadyExists,
+        E_INVALID_FILENAME => ErrorKind::InvalidFilename,
+        E_NOT_FOUND => ErrorKind::NotFound,
+        E_TIMED_OUT => ErrorKind::TimedOut,
+        E_NOT_IMPLEMENTED => ErrorKind::Unsupported,
+        E_FILE_TOO_LARGE => ErrorKind::FileTooLarge,
+        E_UNEXPECTED_EOF => ErrorKind::UnexpectedEof,
+        _ => ErrorKind::Other,
     };
 
     crate::io::Error::from(kind)

@@ -157,10 +157,9 @@ pub(crate) mod key {
             mod racy;
             #[cfg(test)]
             mod tests;
-            mod moturus;
             pub(super) use racy::LazyKey;
-            pub(super) use moturus::{Key, get, set};
-            use moturus::{create, destroy};
+            pub(super) use moto_rt::tls::{Key, get, set};
+            use moto_rt::tls::{create, destroy};
         }
     }
 }
