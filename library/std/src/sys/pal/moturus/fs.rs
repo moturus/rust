@@ -1,277 +1,205 @@
+use super::map_moturus_error;
 use crate::ffi::OsString;
-use crate::fmt;
-use crate::hash::{Hash, Hasher};
+use crate::hash::Hash;
 use crate::io::{self, BorrowedCursor, IoSlice, IoSliceMut, SeekFrom};
 use crate::path::{Path, PathBuf};
 use crate::sys::time::SystemTime;
 use crate::sys::unsupported;
 pub use crate::sys_common::fs::exists;
 
-use super::map_moturus_error;
-
-pub struct File {
-    inner: moto_runtime::fs::File,
-}
-
-pub struct FileAttr {
-    inner: moto_runtime::fs::FileAttr,
-}
-
-pub struct ReadDir {
-    inner: moto_runtime::fs::ReadDir,
-}
-
-pub struct DirEntry {
-    inner: moto_runtime::fs::DirEntry,
-}
-
-#[derive(Clone, Debug)]
-pub struct OpenOptions {
-    inner: moto_runtime::fs::OpenOptions,
-}
-
-#[derive(Copy, Clone, Debug, Default)]
-pub struct FileTimes {
-    inner: moto_runtime::fs::FileTimes,
-}
-
-pub struct FilePermissions {
-    inner: moto_runtime::fs::FilePermissions,
-}
-
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FileType {
-    inner: moto_runtime::fs::FileType,
-}
-
-impl FileAttr {
-    pub fn size(&self) -> u64 {
-        self.inner.size()
-    }
-
-    pub fn perm(&self) -> FilePermissions {
-        FilePermissions { inner: self.inner.perm() }
-    }
-
-    pub fn file_type(&self) -> FileType {
-        FileType { inner: self.inner.file_type() }
-    }
-
-    pub fn modified(&self) -> io::Result<SystemTime> {
-        self.inner
-            .modified()
-            .map(|ts| -> SystemTime { SystemTime::from_unix_ts(ts) })
-            .map_err(map_moturus_error)
-    }
-
-    pub fn accessed(&self) -> io::Result<SystemTime> {
-        self.inner
-            .accessed()
-            .map(|ts| -> SystemTime { SystemTime::from_unix_ts(ts) })
-            .map_err(map_moturus_error)
-    }
-
-    pub fn created(&self) -> io::Result<SystemTime> {
-        self.inner
-            .created()
-            .map(|ts| -> SystemTime { SystemTime::from_unix_ts(ts) })
-            .map_err(map_moturus_error)
-    }
-}
-
-impl Clone for FileAttr {
-    fn clone(&self) -> FileAttr {
-        FileAttr { inner: self.inner.clone() }
-    }
-}
-
-impl FilePermissions {
-    pub fn readonly(&self) -> bool {
-        self.inner.readonly()
-    }
-
-    pub fn set_readonly(&mut self, readonly: bool) {
-        self.inner.set_readonly(readonly)
-    }
-}
-
-impl Clone for FilePermissions {
-    fn clone(&self) -> FilePermissions {
-        FilePermissions { inner: self.inner.clone() }
-    }
-}
-
-impl PartialEq for FilePermissions {
-    fn eq(&self, other: &FilePermissions) -> bool {
-        self.inner.eq(&other.inner)
-    }
-}
-
-impl Eq for FilePermissions {}
-
-impl fmt::Debug for FilePermissions {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
-impl FileTimes {
-    pub fn set_accessed(&mut self, t: SystemTime) {
-        self.inner.set_accessed(t.as_unix_ts())
-    }
-
-    pub fn set_modified(&mut self, t: SystemTime) {
-        self.inner.set_modified(t.as_unix_ts())
-    }
+    rt_filetype: u8,
 }
 
 impl FileType {
     pub fn is_dir(&self) -> bool {
-        self.inner.is_dir()
+        self.rt_filetype == moto_rt::fs::FILETYPE_DIRECTORY
     }
 
     pub fn is_file(&self) -> bool {
-        self.inner.is_file()
+        self.rt_filetype == moto_rt::fs::FILETYPE_FILE
     }
 
     pub fn is_symlink(&self) -> bool {
-        self.inner.is_symlink()
+        false
     }
 }
 
-impl Clone for FileType {
-    fn clone(&self) -> FileType {
-        FileType { inner: self.inner.clone() }
-    }
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct FilePermissions {
+    rt_perm: u64,
 }
 
-impl Copy for FileType {}
-
-impl PartialEq for FileType {
-    fn eq(&self, other: &FileType) -> bool {
-        self.inner.eq(&other.inner)
+impl FilePermissions {
+    pub fn readonly(&self) -> bool {
+        (self.rt_perm & moto_rt::fs::PERM_WRITE == 0)
+            && (self.rt_perm & moto_rt::fs::PERM_READ != 0)
     }
-}
 
-impl Eq for FileType {}
-
-impl Hash for FileType {
-    fn hash<H: Hasher>(&self, h: &mut H) {
-        self.inner.hash(h)
-    }
-}
-
-impl fmt::Debug for FileType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
-impl fmt::Debug for ReadDir {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
-impl Iterator for ReadDir {
-    type Item = io::Result<DirEntry>;
-
-    fn next(&mut self) -> Option<io::Result<DirEntry>> {
-        let res = self.inner.next();
-        if res.is_none() {
-            return None;
+    pub fn set_readonly(&mut self, readonly: bool) {
+        if readonly {
+            self.rt_perm = moto_rt::fs::PERM_READ;
+        } else {
+            self.rt_perm = moto_rt::fs::PERM_READ | moto_rt::fs::PERM_WRITE;
         }
-
-        let res = unsafe { res.unwrap_unchecked() };
-        Some(res.map(|inner| -> DirEntry { DirEntry { inner: inner } }).map_err(map_moturus_error))
     }
 }
 
-impl DirEntry {
-    pub fn path(&self) -> PathBuf {
-        self.inner.path().to_owned().into()
+#[derive(Copy, Clone, Debug, Default)]
+pub struct FileTimes {
+    modified: u128,
+    accessed: u128,
+}
+
+impl FileTimes {
+    pub fn set_accessed(&mut self, t: SystemTime) {
+        self.accessed = t.as_u128();
     }
 
-    pub fn file_name(&self) -> OsString {
-        self.inner.file_name().to_owned().into()
+    pub fn set_modified(&mut self, t: SystemTime) {
+        self.modified = t.as_u128();
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct FileAttr {
+    inner: moto_rt::fs::FileAttr,
+}
+
+impl FileAttr {
+    pub fn size(&self) -> u64 {
+        self.inner.size
     }
 
-    pub fn metadata(&self) -> io::Result<FileAttr> {
-        self.inner
-            .metadata()
-            .map(|inner| -> FileAttr { FileAttr { inner: inner } })
-            .map_err(map_moturus_error)
+    pub fn perm(&self) -> FilePermissions {
+        FilePermissions { rt_perm: self.inner.perm }
     }
 
-    pub fn file_type(&self) -> io::Result<FileType> {
-        self.inner
-            .file_type()
-            .map(|inner| -> FileType { FileType { inner: inner } })
-            .map_err(map_moturus_error)
+    pub fn file_type(&self) -> FileType {
+        FileType { rt_filetype: self.inner.file_type }
     }
+
+    pub fn modified(&self) -> io::Result<SystemTime> {
+        match self.inner.modified {
+            0 => Err(crate::io::Error::from(crate::io::ErrorKind::Other)),
+            x => Ok(SystemTime::from_u128(x)),
+        }
+    }
+
+    pub fn accessed(&self) -> io::Result<SystemTime> {
+        match self.inner.accessed {
+            0 => Err(crate::io::Error::from(crate::io::ErrorKind::Other)),
+            x => Ok(SystemTime::from_u128(x)),
+        }
+    }
+
+    pub fn created(&self) -> io::Result<SystemTime> {
+        match self.inner.created {
+            0 => Err(crate::io::Error::from(crate::io::ErrorKind::Other)),
+            x => Ok(SystemTime::from_u128(x)),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct OpenOptions {
+    rt_open_options: u32,
 }
 
 impl OpenOptions {
     pub fn new() -> OpenOptions {
-        OpenOptions { inner: moto_runtime::fs::OpenOptions::new() }
+        OpenOptions { rt_open_options: 0 }
     }
 
     pub fn read(&mut self, read: bool) {
-        self.inner.read(read)
+        if read {
+            self.rt_open_options |= moto_rt::fs::O_READ;
+        } else {
+            self.rt_open_options &= !moto_rt::fs::O_READ;
+        }
     }
 
     pub fn write(&mut self, write: bool) {
-        self.inner.write(write)
+        if write {
+            self.rt_open_options |= moto_rt::fs::O_WRITE;
+        } else {
+            self.rt_open_options &= !moto_rt::fs::O_WRITE;
+        }
     }
 
     pub fn append(&mut self, append: bool) {
-        self.inner.append(append)
+        if append {
+            self.rt_open_options |= moto_rt::fs::O_APPEND;
+        } else {
+            self.rt_open_options &= !moto_rt::fs::O_APPEND;
+        }
     }
 
     pub fn truncate(&mut self, truncate: bool) {
-        self.inner.truncate(truncate)
+        if truncate {
+            self.rt_open_options |= moto_rt::fs::O_TRUNCATE;
+        } else {
+            self.rt_open_options &= !moto_rt::fs::O_TRUNCATE;
+        }
     }
 
     pub fn create(&mut self, create: bool) {
-        self.inner.create(create)
+        if create {
+            self.rt_open_options |= moto_rt::fs::O_CREATE;
+        } else {
+            self.rt_open_options &= !moto_rt::fs::O_CREATE;
+        }
     }
 
     pub fn create_new(&mut self, create_new: bool) {
-        self.inner.create_new(create_new)
+        if create_new {
+            self.rt_open_options |= moto_rt::fs::O_CREATE_NEW;
+        } else {
+            self.rt_open_options &= !moto_rt::fs::O_CREATE_NEW;
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct File {
+    rt_fd: moto_rt::RtFd,
+}
+
+impl Drop for File {
+    fn drop(&mut self) {
+        moto_rt::fs::close(self.rt_fd).unwrap();
     }
 }
 
 impl File {
     pub fn open(path: &Path, opts: &OpenOptions) -> io::Result<File> {
-        let path_str = path.to_str();
-        if path_str.is_none() {
-            return Err(io::Error::from(io::ErrorKind::InvalidFilename));
-        }
-        moto_runtime::fs::File::open(path_str.unwrap(), &opts.inner)
-            .map(|inner| Self { inner })
+        let path = path.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+        moto_rt::fs::open(path, opts.rt_open_options)
+            .map(|rt_fd| Self { rt_fd })
             .map_err(map_moturus_error)
     }
 
     pub fn file_attr(&self) -> io::Result<FileAttr> {
-        self.inner
-            .file_attr()
-            .map(|inner| -> FileAttr { FileAttr { inner: inner } })
+        moto_rt::fs::get_file_attr(self.rt_fd)
+            .map(|inner| -> FileAttr { FileAttr { inner } })
             .map_err(map_moturus_error)
     }
 
     pub fn fsync(&self) -> io::Result<()> {
-        self.inner.fsync().map_err(map_moturus_error)
+        moto_rt::fs::fsync(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn datasync(&self) -> io::Result<()> {
-        self.inner.datasync().map_err(map_moturus_error)
+        moto_rt::fs::datasync(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn truncate(&self, size: u64) -> io::Result<()> {
-        self.inner.truncate(size).map_err(map_moturus_error)
+        moto_rt::fs::truncate(self.rt_fd, size).map_err(map_moturus_error)
     }
 
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(buf).map_err(map_moturus_error)
+        moto_rt::fs::read(self.rt_fd, buf).map_err(map_moturus_error)
     }
 
     pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
@@ -287,7 +215,7 @@ impl File {
     }
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.write(buf).map_err(map_moturus_error)
+        moto_rt::fs::write(self.rt_fd, buf).map_err(map_moturus_error)
     }
 
     pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
@@ -303,12 +231,18 @@ impl File {
     }
 
     pub fn seek(&self, pos: SeekFrom) -> io::Result<u64> {
-        let p = match pos {
-            SeekFrom::Start(n) => moto_runtime::fs::SeekFrom::Start(n),
-            SeekFrom::End(n) => moto_runtime::fs::SeekFrom::End(n),
-            SeekFrom::Current(n) => moto_runtime::fs::SeekFrom::Current(n),
-        };
-        self.inner.seek(p).map_err(map_moturus_error)
+        match pos {
+            SeekFrom::Start(offset) => {
+                moto_rt::fs::seek(self.rt_fd, offset as i64, moto_rt::fs::SEEK_SET)
+                    .map_err(map_moturus_error)
+            }
+            SeekFrom::End(offset) => moto_rt::fs::seek(self.rt_fd, offset, moto_rt::fs::SEEK_END)
+                .map_err(map_moturus_error),
+            SeekFrom::Current(offset) => {
+                moto_rt::fs::seek(self.rt_fd, offset, moto_rt::fs::SEEK_CUR)
+                    .map_err(map_moturus_error)
+            }
+        }
     }
 
     pub fn duplicate(&self) -> io::Result<File> {
@@ -325,80 +259,43 @@ impl File {
 }
 
 #[derive(Debug)]
-pub struct DirBuilder {
-    inner: moto_runtime::fs::DirBuilder,
-}
+pub struct DirBuilder {}
 
 impl DirBuilder {
     pub fn new() -> DirBuilder {
-        DirBuilder { inner: moto_runtime::fs::DirBuilder::new() }
+        DirBuilder {}
     }
 
-    pub fn mkdir(&self, p: &Path) -> io::Result<()> {
-        if let Some(pathname) = p.to_str() {
-            self.inner.mkdir(pathname).map_err(map_moturus_error)
-        } else {
-            Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
-        }
+    pub fn mkdir(&self, path: &Path) -> io::Result<()> {
+        let path = path.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+        moto_rt::fs::mkdir(path).map_err(map_moturus_error)
     }
 }
 
-impl fmt::Debug for File {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(_f)
-    }
-}
-
-pub fn readdir(path: &Path) -> io::Result<ReadDir> {
-    if let Some(pathname) = path.to_str() {
-        moto_runtime::fs::readdir(pathname)
-            .map(|inner| -> ReadDir { ReadDir { inner: inner } })
-            .map_err(map_moturus_error)
-    } else {
-        Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
-    }
-}
-
-pub fn unlink(p: &Path) -> io::Result<()> {
-    if let Some(pathname) = p.to_str() {
-        moto_runtime::fs::unlink(pathname).map_err(map_moturus_error)
-    } else {
-        Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
-    }
+pub fn unlink(path: &Path) -> io::Result<()> {
+    let path = path.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    moto_rt::fs::unlink(path).map_err(map_moturus_error)
 }
 
 pub fn rename(old: &Path, new: &Path) -> io::Result<()> {
-    if let Some(old_path) = old.to_str() {
-        if let Some(new_path) = new.to_str() {
-            return moto_runtime::fs::rename(old_path, new_path).map_err(map_moturus_error);
-        }
-    }
-
-    Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
+    let old = old.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    let new = new.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    moto_rt::fs::rename(old, new).map_err(map_moturus_error)
 }
 
-pub fn set_perm(p: &Path, perm: FilePermissions) -> io::Result<()> {
-    if let Some(pathname) = p.to_str() {
-        moto_runtime::fs::set_perm(pathname, perm.inner).map_err(map_moturus_error)
-    } else {
-        Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
-    }
+pub fn rmdir(path: &Path) -> io::Result<()> {
+    let path = path.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    moto_rt::fs::rmdir(path).map_err(map_moturus_error)
 }
 
-pub fn rmdir(p: &Path) -> io::Result<()> {
-    if let Some(pathname) = p.to_str() {
-        moto_runtime::fs::rmdir(pathname).map_err(map_moturus_error)
-    } else {
-        Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
-    }
+pub fn remove_dir_all(path: &Path) -> io::Result<()> {
+    let path = path.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    moto_rt::fs::rmdir_all(path).map_err(map_moturus_error)
 }
 
-pub fn remove_dir_all(p: &Path) -> io::Result<()> {
-    if let Some(pathname) = p.to_str() {
-        moto_runtime::fs::rmdir_all(pathname).map_err(map_moturus_error)
-    } else {
-        Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
-    }
+pub fn set_perm(path: &Path, perm: FilePermissions) -> io::Result<()> {
+    let path = path.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    moto_rt::fs::set_perm(path, perm.rt_perm).map_err(map_moturus_error)
 }
 
 pub fn readlink(_p: &Path) -> io::Result<PathBuf> {
@@ -413,36 +310,91 @@ pub fn link(_src: &Path, _dst: &Path) -> io::Result<()> {
     unsupported()
 }
 
-pub fn stat(p: &Path) -> io::Result<FileAttr> {
-    if let Some(path) = p.to_str() {
-        moto_runtime::fs::stat(path)
-            .map(|inner| -> FileAttr { FileAttr { inner: inner } })
-            .map_err(map_moturus_error)
-    } else {
-        Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
+pub fn stat(path: &Path) -> io::Result<FileAttr> {
+    let path = path.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    let inner = moto_rt::fs::stat(path).map_err(map_moturus_error)?;
+    Ok(FileAttr { inner })
+}
+
+pub fn lstat(path: &Path) -> io::Result<FileAttr> {
+    stat(path)
+}
+
+pub fn canonicalize(path: &Path) -> io::Result<PathBuf> {
+    let path = path.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    let path = moto_rt::fs::canonicalize(path).map_err(map_moturus_error)?;
+    Ok(path.into())
+}
+
+pub fn copy(from: &Path, to: &Path) -> io::Result<u64> {
+    let from = from.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    let to = to.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    moto_rt::fs::copy(from, to).map_err(map_moturus_error)
+}
+
+#[derive(Debug)]
+pub struct ReadDir {
+    rt_fd: moto_rt::RtFd,
+    path: String,
+}
+
+impl Drop for ReadDir {
+    fn drop(&mut self) {
+        moto_rt::fs::closedir(self.rt_fd).unwrap();
     }
 }
 
-pub fn lstat(p: &Path) -> io::Result<FileAttr> {
-    if let Some(path) = p.to_str() {
-        moto_runtime::fs::lstat(path)
-            .map(|inner| -> FileAttr { FileAttr { inner: inner } })
-            .map_err(map_moturus_error)
-    } else {
-        Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
+pub fn readdir(path: &Path) -> io::Result<ReadDir> {
+    let path = path.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
+    Ok(ReadDir {
+        rt_fd: moto_rt::fs::opendir(path).map_err(map_moturus_error)?,
+        path: path.to_owned(),
+    })
+}
+
+impl Iterator for ReadDir {
+    type Item = io::Result<DirEntry>;
+
+    fn next(&mut self) -> Option<io::Result<DirEntry>> {
+        match moto_rt::fs::readdir(self.rt_fd).map_err(map_moturus_error) {
+            Ok(maybe_item) => match maybe_item {
+                Some(inner) => Some(Ok(DirEntry { inner, parent_path: self.path.clone() })),
+                None => None,
+            },
+            Err(err) => Some(Err(err)),
+        }
     }
 }
 
-pub fn canonicalize(p: &Path) -> io::Result<PathBuf> {
-    if let Some(path) = p.to_str() {
-        moto_runtime::fs::canonicalize(path)
-            .map(|s| -> PathBuf { s.into() })
-            .map_err(map_moturus_error)
-    } else {
-        Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
-    }
+pub struct DirEntry {
+    parent_path: String,
+    inner: moto_rt::fs::DirEntry,
 }
 
-pub fn copy(_from: &Path, _to: &Path) -> io::Result<u64> {
-    unsupported()
+impl DirEntry {
+    fn filename(&self) -> &str {
+        core::str::from_utf8(unsafe {
+            core::slice::from_raw_parts(self.inner.fname.as_ptr(), self.inner.fname_size as usize)
+        })
+        .unwrap()
+    }
+
+    pub fn path(&self) -> PathBuf {
+        let mut path = self.parent_path.clone();
+        path.push_str("/");
+        path.push_str(self.filename());
+        path.into()
+    }
+
+    pub fn file_name(&self) -> OsString {
+        self.filename().to_owned().into()
+    }
+
+    pub fn metadata(&self) -> io::Result<FileAttr> {
+        Ok(FileAttr { inner: self.inner.attr })
+    }
+
+    pub fn file_type(&self) -> io::Result<FileType> {
+        Ok(FileType { rt_filetype: self.inner.attr.file_type })
+    }
 }

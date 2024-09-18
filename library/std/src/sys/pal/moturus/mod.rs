@@ -13,7 +13,7 @@ pub mod stdio;
 pub mod thread;
 pub mod time;
 
-pub use moto_runtime::futex;
+pub use moto_rt::futex;
 
 pub mod pipe {
     pub use super::io_pipe::{read2, IoPipe as AnonPipe};

@@ -200,6 +200,7 @@ name = "moto-rt"
 version = "0.1.0"
 dependencies = [
  "compiler_builtins",
+ "rustc-std-workspace-alloc",
  "rustc-std-workspace-core",
 ]
 

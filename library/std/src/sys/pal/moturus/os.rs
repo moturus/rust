@@ -1,12 +1,9 @@
+use super::map_moturus_error;
 use crate::error::Error as StdError;
 use crate::ffi::{OsStr, OsString};
-use crate::fmt;
-use crate::io;
-use crate::vec;
 use crate::marker::PhantomData;
 use crate::path::{self, PathBuf};
-
-use super::map_moturus_error;
+use crate::{fmt, io, vec};
 
 pub fn errno() -> i32 {
     // Why is this here? This belongs to libc.
@@ -22,8 +19,7 @@ pub fn getcwd() -> io::Result<PathBuf> {
     // The CWD is a bad/outdated/unix design, from a single-threaded era:
     // concurrent changes to CWD lead to races. Applications/processes
     // should manage their CWD, not the OS.
-    moto_runtime::fs::getcwd().map(|s| ->
-        PathBuf { s.into() }).map_err(map_moturus_error)
+    moto_rt::fs::getcwd().map(|s| -> PathBuf { s.into() }).map_err(map_moturus_error)
 }
 
 pub fn chdir(path: &path::Path) -> io::Result<()> {
@@ -31,7 +27,7 @@ pub fn chdir(path: &path::Path) -> io::Result<()> {
     // concurrent changes to CWD lead to races. Applications/processes
     // should manage their CWD, not the OS.
     if let Some(path) = path.to_str() {
-        moto_runtime::fs::chdir(path).map_err(map_moturus_error)
+        moto_rt::fs::chdir(path).map_err(map_moturus_error)
     } else {
         Err(io::Error::new(io::ErrorKind::InvalidFilename, ""))
     }
@@ -75,11 +71,7 @@ impl StdError for JoinPathsError {
 }
 
 pub fn current_exe() -> io::Result<PathBuf> {
-    if let Some(exe) = super::args::args().next() {
-        Ok(exe.into())
-    } else {
-        Ok("<unknown>".into())
-    }
+    if let Some(exe) = super::args::args().next() { Ok(exe.into()) } else { Ok("<unknown>".into()) }
 }
 
 #[derive(Debug)]
@@ -116,14 +108,11 @@ impl Iterator for Env {
 }
 
 pub fn env() -> Env {
-    let moturus_env = moto_runtime::env::env();  // Vec<(&'static [u8], &'static [u8])>
+    let moturus_env = moto_runtime::env::env(); // Vec<(&'static [u8], &'static [u8])>
     let mut rust_env = vec![];
 
     for (k, v) in moturus_env {
-        rust_env.push((
-            OsString::from(k),
-            OsString::from(v)
-        ));
+        rust_env.push((OsString::from(k), OsString::from(v)));
     }
 
     Env { env: rust_env.into_iter() }
