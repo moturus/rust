@@ -108,7 +108,7 @@ impl Iterator for Env {
 }
 
 pub fn env() -> Env {
-    let moturus_env = moto_runtime::env::env(); // Vec<(&'static [u8], &'static [u8])>
+    let moturus_env = moto_rt::process::env(); // Vec<(String, String)>
     let mut rust_env = vec![];
 
     for (k, v) in moturus_env {
@@ -119,15 +119,15 @@ pub fn env() -> Env {
 }
 
 pub fn getenv(key: &OsStr) -> Option<OsString> {
-    moto_runtime::env::getenv(key.to_str().unwrap()).map(|s| OsString::from(s))
+    moto_rt::process::getenv(key.to_str().unwrap()).map(|s| OsString::from(s))
 }
 
 pub unsafe fn setenv(key: &OsStr, val: &OsStr) -> io::Result<()> {
-    Ok(moto_runtime::env::setenv(key.to_str().unwrap(), val.to_str().unwrap()))
+    Ok(moto_rt::process::setenv(key.to_str().unwrap(), val.to_str().unwrap()))
 }
 
 pub unsafe fn unsetenv(key: &OsStr) -> io::Result<()> {
-    Ok(moto_runtime::env::unsetenv(key.to_str().unwrap()))
+    Ok(moto_rt::process::unsetenv(key.to_str().unwrap()))
 }
 
 pub fn temp_dir() -> PathBuf {
