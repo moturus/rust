@@ -227,7 +227,7 @@ impl File {
     }
 
     pub fn flush(&self) -> io::Result<()> {
-        Ok(())
+        moto_rt::fs::flush(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn seek(&self, pos: SeekFrom) -> io::Result<u64> {
