@@ -1,13 +1,12 @@
 use crate::ffi::OsString;
-use crate::fmt;
-use crate::vec;
+use crate::{fmt, vec};
 
 pub struct Args {
     args: vec::IntoIter<OsString>,
 }
 
 pub fn args() -> Args {
-    let moturus_args = moto_runtime::args::args();  // Vec<&'static [u8]>
+    let moturus_args = moto_rt::process::args(); // Vec<String>
     let mut rust_args = vec![];
 
     for arg in moturus_args {
