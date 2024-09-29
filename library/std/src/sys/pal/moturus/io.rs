@@ -46,44 +46,49 @@ impl<'a> IoSliceMut<'a> {
     }
 }
 
-pub trait FrostRtStream {
-    fn is_terminal_impl(&self) -> bool {
-        false
-    }
+pub trait MoturusIsTerminal {
+    fn is_terminal_impl(&self) -> bool;
 }
 
-pub fn is_terminal(val: &impl FrostRtStream) -> bool {
+pub fn is_terminal(val: &impl MoturusIsTerminal) -> bool {
     val.is_terminal_impl()
 }
 
-impl FrostRtStream for crate::fs::File {}
-impl FrostRtStream for crate::io::Stdin {
+impl MoturusIsTerminal for crate::fs::File {
     fn is_terminal_impl(&self) -> bool {
-        true
+        use crate::sys_common::AsInner;
+
+        self.as_inner().is_terminal()
     }
 }
-impl FrostRtStream for crate::io::Stdout {
+
+impl MoturusIsTerminal for crate::io::Stdin {
     fn is_terminal_impl(&self) -> bool {
-        true
+        moto_rt::fs::is_terminal(moto_rt::FD_STDIN)
     }
 }
-impl FrostRtStream for crate::io::Stderr {
+impl MoturusIsTerminal for crate::io::Stdout {
     fn is_terminal_impl(&self) -> bool {
-        true
+        moto_rt::fs::is_terminal(moto_rt::FD_STDOUT)
     }
 }
-impl FrostRtStream for crate::io::StdinLock<'_> {
+impl MoturusIsTerminal for crate::io::Stderr {
     fn is_terminal_impl(&self) -> bool {
-        true
+        moto_rt::fs::is_terminal(moto_rt::FD_STDERR)
     }
 }
-impl FrostRtStream for crate::io::StdoutLock<'_> {
+impl MoturusIsTerminal for crate::io::StdinLock<'_> {
     fn is_terminal_impl(&self) -> bool {
-        true
+        moto_rt::fs::is_terminal(moto_rt::FD_STDIN)
     }
 }
-impl FrostRtStream for crate::io::StderrLock<'_> {
+impl MoturusIsTerminal for crate::io::StdoutLock<'_> {
     fn is_terminal_impl(&self) -> bool {
-        true
+        moto_rt::fs::is_terminal(moto_rt::FD_STDOUT)
+    }
+}
+impl MoturusIsTerminal for crate::io::StderrLock<'_> {
+    fn is_terminal_impl(&self) -> bool {
+        moto_rt::fs::is_terminal(moto_rt::FD_STDERR)
     }
 }

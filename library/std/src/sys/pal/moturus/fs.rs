@@ -202,6 +202,10 @@ impl File {
         moto_rt::fs::read(self.rt_fd, buf).map_err(map_moturus_error)
     }
 
+    pub fn is_terminal(&self) -> bool {
+        moto_rt::fs::is_terminal(self.rt_fd)
+    }
+
     pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         crate::io::default_read_vectored(|b| self.read(b), bufs)
     }
