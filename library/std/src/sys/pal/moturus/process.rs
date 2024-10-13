@@ -1,58 +1,62 @@
+use super::io_pipe::IoPipe;
 use crate::ffi::OsStr;
-use crate::fmt;
-use crate::io;
+pub use crate::ffi::OsString as EnvKey;
 use crate::num::NonZeroI32;
 use crate::path::Path;
 use crate::sys::fs::File;
-use super::io_pipe::IoPipe;
 use crate::sys_common::process::{CommandEnv, CommandEnvs};
-
-pub use crate::ffi::OsString as EnvKey;
-use moto_runtime::process::*;
+use crate::{fmt, io};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command
 ////////////////////////////////////////////////////////////////////////////////
 
-pub struct Command {
-    command_rt: CommandRt,
+#[derive(Clone)]
+pub(crate) enum Stdio {
+    Inherit,
+    Null,
+    MakePipe,
+    Fd(moto_rt::RtFd),
+}
+
+impl Stdio {
+    fn to_rt(&self) -> moto_rt::RtFd {
+        match self {
+            Stdio::Inherit => moto_rt::process::STDIO_INHERIT,
+            Stdio::Null => moto_rt::process::STDIO_NULL,
+            Stdio::MakePipe => moto_rt::process::STDIO_MAKE_PIPE,
+            Stdio::Fd(rt_fd) => {
+                assert!(*rt_fd >= 0);
+                *rt_fd
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct Command {
+    program: String,
+    args: Vec<String>,
+    cwd: Option<String>,
+    stdin: Option<Stdio>,
+    stdout: Option<Stdio>,
+    stderr: Option<Stdio>,
     env: CommandEnv,
 }
 
-pub struct StdioPipes {
+pub(crate) struct StdioPipes {
     pub stdin: Option<IoPipe>,
     pub stdout: Option<IoPipe>,
     pub stderr: Option<IoPipe>,
 }
 
-pub enum Stdio {
-    Inherit,
-    Null,
-    MakePipe,
-    Pipe(IoPipe),
-}
-
-impl Stdio {
-    fn to_rt(self) -> StdioRt {
-        match self {
-            Stdio::Inherit => StdioRt::Inherit,
-            Stdio::Null => StdioRt::Null,
-            Stdio::MakePipe => StdioRt::MakePipe,
-            Stdio::Pipe(pipe) => StdioRt::Pipe(pipe.pipe_rt.into_inner().unwrap()),
-        }
-    }
-}
-
 impl Command {
     pub fn new(program: &OsStr) -> Command {
-        Command {
-            command_rt: CommandRt::new(program.to_str().unwrap()),
-            env: Default::default(),
-        }
+        Command { program: program.to_str().unwrap().to_owned(), ..Default::default() }
     }
 
     pub fn arg(&mut self, arg: &OsStr) {
-        self.command_rt.arg(arg.to_str().unwrap())
+        self.args.push(arg.to_str().unwrap().to_owned())
     }
 
     pub fn env_mut(&mut self) -> &mut CommandEnv {
@@ -60,27 +64,27 @@ impl Command {
     }
 
     pub fn cwd(&mut self, dir: &OsStr) {
-        self.command_rt.cwd(dir.to_str().unwrap())
+        self.cwd = Some(dir.to_str().unwrap().to_owned())
     }
 
     pub fn stdin(&mut self, stdin: Stdio) {
-        self.command_rt.stdin(stdin.to_rt());
+        self.stdin = Some(stdin);
     }
 
     pub fn stdout(&mut self, stdout: Stdio) {
-        self.command_rt.stdout(stdout.to_rt());
+        self.stdout = Some(stdout);
     }
 
     pub fn stderr(&mut self, stderr: Stdio) {
-        self.command_rt.stderr(stderr.to_rt());
+        self.stderr = Some(stderr);
     }
 
     pub fn get_program(&self) -> &OsStr {
-        OsStr::new(self.command_rt.get_program())
+        OsStr::new(self.program.as_str())
     }
 
     pub fn get_args(&self) -> CommandArgs<'_> {
-        let iter = self.command_rt.get_args().iter();
+        let iter = self.args.iter();
         CommandArgs { iter }
     }
 
@@ -89,7 +93,7 @@ impl Command {
     }
 
     pub fn get_current_dir(&self) -> Option<&Path> {
-        self.command_rt.get_current_dir().map(Path::new)
+        self.cwd.as_ref().map(Path::new)
     }
 
     pub fn spawn(
@@ -97,28 +101,40 @@ impl Command {
         default: Stdio,
         needs_stdin: bool,
     ) -> io::Result<(Process, StdioPipes)> {
-        let default_rt = default.to_rt();
+        let stdin = self
+            .stdin
+            .clone()
+            .unwrap_or(if needs_stdin { default.clone() } else { Stdio::Null })
+            .to_rt();
+        let stdout = self.stdout.clone().unwrap_or(default.clone()).to_rt();
+        let stderr = self.stderr.clone().unwrap_or(default.clone()).to_rt();
 
-        let mut env_rt = Vec::<(String, String)>::new();
-        for (k,v) in self.env.capture() {
-            env_rt.push((k.into_string().unwrap(), v.into_string().unwrap()));
+        let mut env = Vec::<(String, String)>::new();
+        for (k, v) in self.env.capture() {
+            env.push((k.into_string().unwrap(), v.into_string().unwrap()));
         }
 
-        let (rt_process, rt_pipes) = moto_runtime::process::spawn(
-                &mut self.command_rt, env_rt, default_rt, needs_stdin).
-            map_err(super::map_moturus_error)?;
+        let args = moto_rt::process::SpawnArgs {
+            program: self.program.clone(),
+            args: self.args.clone(),
+            env,
+            cwd: self.cwd.clone(),
+            stdin,
+            stdout,
+            stderr,
+        };
 
-        match rt_pipes {
-            moto_runtime::process::StdioPipesRt { stdin, stdout, stderr } =>
-                Ok((
-                    Process{ rt_process },
-                    StdioPipes {
-                        stdin : stdin .map(IoPipe::new),
-                        stdout: stdout.map(IoPipe::new),
-                        stderr: stderr.map(IoPipe::new),
-                    }
-            ))
-        }
+        let (handle, stdin, stdout, stderr) =
+            moto_rt::process::spawn(args).map_err(super::map_moturus_error)?;
+
+        Ok((
+            Process { handle },
+            StdioPipes {
+                stdin: if stdin >= 0 { Some(stdin.into()) } else { None },
+                stdout: if stdout >= 0 { Some(stdout.into()) } else { None },
+                stderr: if stderr >= 0 { Some(stderr.into()) } else { None },
+            },
+        ))
     }
 
     pub fn output(&mut self) -> io::Result<(ExitStatus, Vec<u8>, Vec<u8>)> {
@@ -126,9 +142,9 @@ impl Command {
     }
 }
 
-impl From<IoPipe> for Stdio {
-    fn from(pipe: IoPipe) -> Stdio {
-        Stdio::Pipe(pipe)
+impl From<super::io_pipe::IoPipe> for Stdio {
+    fn from(pipe: super::io_pipe::IoPipe) -> Stdio {
+        Stdio::Fd(pipe.rt_fd)
     }
 }
 
@@ -161,15 +177,11 @@ impl fmt::Debug for Command {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub struct ExitStatus(i32);
+pub(crate) struct ExitStatus(i32);
 
 impl ExitStatus {
     pub fn exit_ok(&self) -> Result<(), ExitStatusError> {
-        if self.0 == 0 {
-            Ok(())
-        } else {
-            Err(ExitStatusError(*self))
-        }
+        if self.0 == 0 { Ok(()) } else { Err(ExitStatusError(*self)) }
     }
 
     pub fn code(&self) -> Option<i32> {
@@ -183,7 +195,7 @@ impl fmt::Display for ExitStatus {
     }
 }
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct ExitStatusError(ExitStatus);
+pub(crate) struct ExitStatusError(ExitStatus);
 
 impl Into<ExitStatus> for ExitStatusError {
     fn into(self) -> ExitStatus {
@@ -198,7 +210,7 @@ impl ExitStatusError {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct ExitCode(i32);
+pub(crate) struct ExitCode(i32);
 
 impl ExitCode {
     pub const SUCCESS: ExitCode = ExitCode(0);
@@ -215,8 +227,8 @@ impl From<u8> for ExitCode {
     }
 }
 
-pub struct Process {
-    rt_process: moto_runtime::process::Process
+pub(crate) struct Process {
+    handle: u64,
 }
 
 impl Process {
@@ -225,32 +237,35 @@ impl Process {
     }
 
     pub fn kill(&mut self) -> io::Result<()> {
-        self.rt_process.kill().map_err(super::map_moturus_error)
+        match moto_rt::process::kill(self.handle) {
+            moto_rt::E_OK => Ok(()),
+            err => Err(super::map_moturus_error(err)),
+        }
     }
 
     pub fn wait(&mut self) -> io::Result<ExitStatus> {
-        self.rt_process.wait().map(|c| { ExitStatus(c) }).
-            map_err(super::map_moturus_error)
+        moto_rt::process::wait(self.handle).map(|c| ExitStatus(c)).map_err(super::map_moturus_error)
     }
 
     pub fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
-        self.rt_process.try_wait().map(|c| {
-                c.map(|c| { ExitStatus(c) })
-            }).
-            map_err(super::map_moturus_error)
+        match moto_rt::process::try_wait(self.handle) {
+            Ok(s) => Ok(Some(ExitStatus(s))),
+            Err(err) => match err {
+                moto_rt::E_NOT_READY => Ok(None),
+                err => Err(super::map_moturus_error(err)),
+            },
+        }
     }
 }
 
-pub struct CommandArgs<'a> {
+pub(crate) struct CommandArgs<'a> {
     iter: crate::slice::Iter<'a, String>,
 }
 
 impl<'a> Iterator for CommandArgs<'a> {
     type Item = &'a OsStr;
     fn next(&mut self) -> Option<&'a OsStr> {
-        self.iter.next().map(|arg| {
-            OsStr::new(arg)
-        })
+        self.iter.next().map(|arg| OsStr::new(arg))
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.iter.size_hint()

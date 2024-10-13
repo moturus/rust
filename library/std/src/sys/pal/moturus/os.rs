@@ -71,7 +71,7 @@ impl StdError for JoinPathsError {
 }
 
 pub fn current_exe() -> io::Result<PathBuf> {
-    if let Some(exe) = super::args::args().next() { Ok(exe.into()) } else { Ok("<unknown>".into()) }
+    Ok(super::args::args().next().unwrap().into())
 }
 
 #[derive(Debug)]
@@ -131,7 +131,7 @@ pub unsafe fn unsetenv(key: &OsStr) -> io::Result<()> {
 }
 
 pub fn temp_dir() -> PathBuf {
-    PathBuf::from(moto_runtime::rt_api::TEMP_DIR)
+    PathBuf::from(moto_rt::fs::TEMP_DIR)
 }
 
 pub fn home_dir() -> Option<PathBuf> {
