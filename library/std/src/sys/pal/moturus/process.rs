@@ -231,6 +231,12 @@ pub(crate) struct Process {
     handle: u64,
 }
 
+impl Drop for Process {
+    fn drop(&mut self) {
+        moto_rt::alloc::release_handle(self.handle).unwrap();
+    }
+}
+
 impl Process {
     pub fn id(&self) -> u32 {
         0
