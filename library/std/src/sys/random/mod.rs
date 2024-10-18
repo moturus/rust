@@ -47,6 +47,9 @@ cfg_if::cfg_if! {
     ))] {
         mod unix_legacy;
         pub use unix_legacy::fill_bytes;
+    } else if #[cfg(target_os = "moturus")] {
+        mod moturus;
+        pub use moturus::fill_bytes;
     } else if #[cfg(target_os = "redox")] {
         mod redox;
         pub use redox::fill_bytes;
