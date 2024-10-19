@@ -47,11 +47,16 @@ pub use common::*;
 #[cfg(not(test))]
 #[no_mangle]
 pub extern "C" fn moturus_start() -> ! {
-    moto_runtime::moturus_start_rt();
+    // Initialize the runtime.
+    moto_rt::start();
+
+    // Call main.
     extern "C" {
         fn main(_: isize, _: *const *const u8, _: u8) -> i32;
     }
     let result = unsafe { main(0, core::ptr::null(), 0) };
+
+    // Terminate the process.
     moto_rt::process::exit(result)
 }
 
