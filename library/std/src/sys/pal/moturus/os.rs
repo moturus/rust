@@ -139,7 +139,7 @@ pub fn home_dir() -> Option<PathBuf> {
 }
 
 pub fn exit(code: i32) -> ! {
-    moto_runtime::exit(code)
+    moto_rt::process::exit(code)
 }
 
 pub fn getpid() -> u32 {

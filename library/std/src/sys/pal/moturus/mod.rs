@@ -52,7 +52,7 @@ pub extern "C" fn moturus_start() -> ! {
         fn main(_: isize, _: *const *const u8, _: u8) -> i32;
     }
     let result = unsafe { main(0, core::ptr::null(), 0) };
-    moto_runtime::sys_exit(result as u64);
+    moto_rt::process::exit(result)
 }
 
 // This function is needed by the panic runtime. The symbol is named in
@@ -61,7 +61,7 @@ pub extern "C" fn moturus_start() -> ! {
 #[no_mangle]
 // NB. used by both libunwind and libpanic_abort
 pub extern "C" fn __rust_abort() {
-    moto_runtime::sys_exit(u64::MAX)
+    moto_rt::process::exit(-1)
 }
 
 pub fn map_moturus_error(err: moto_rt::ErrorCode) -> crate::io::Error {
