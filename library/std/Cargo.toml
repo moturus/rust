@@ -77,8 +77,7 @@ fortanix-sgx-abi = { version = "0.5.0", features = [
 ], public = true }
 
 [target.'cfg(target_os = "moturus")'.dependencies]
-moto-rt      = { path = "../../../motor-os/src/sys/lib/moto-rt"     , features = ['rustc-dep-of-std'] }
-moto-runtime = { path = "../../../motor-os/src/sys/lib/moto-runtime", features = ['rustc-dep-of-std'] }
+moto-rt      = { path = "../../../motor-os/src/sys/lib/moto-rt"     , features = ['rustc-dep-of-std'], public = true }
 
 [target.'cfg(target_os = "hermit")'.dependencies]
 hermit-abi = { version = "0.4.0", features = [

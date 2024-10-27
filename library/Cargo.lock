@@ -188,43 +188,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "moto-ipc"
-version = "0.2.5"
-dependencies = [
- "compiler_builtins",
- "moto-rt",
- "moto-sys",
- "rustc-std-workspace-alloc",
- "rustc-std-workspace-core",
-]
-
-[[package]]
 name = "moto-rt"
 version = "0.1.0"
 dependencies = [
  "compiler_builtins",
- "rustc-std-workspace-alloc",
- "rustc-std-workspace-core",
-]
-
-[[package]]
-name = "moto-runtime"
-version = "0.2.9"
-dependencies = [
- "compiler_builtins",
- "moto-ipc",
- "moto-rt",
- "moto-sys",
- "rustc-std-workspace-alloc",
- "rustc-std-workspace-core",
-]
-
-[[package]]
-name = "moto-sys"
-version = "0.2.4"
-dependencies = [
- "compiler_builtins",
- "moto-rt",
  "rustc-std-workspace-alloc",
  "rustc-std-workspace-core",
 ]
@@ -380,7 +347,6 @@ dependencies = [
  "memchr",
  "miniz_oxide",
  "moto-rt",
- "moto-runtime",
  "object",
  "panic_abort",
  "panic_unwind",

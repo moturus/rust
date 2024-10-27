@@ -3,8 +3,8 @@ use crate::ffi::OsString;
 use crate::hash::Hash;
 use crate::io::{self, BorrowedCursor, IoSlice, IoSliceMut, SeekFrom};
 use crate::path::{Path, PathBuf};
-use crate::sys::time::SystemTime;
 use crate::sys::unsupported;
+use crate::sys::time::SystemTime;
 pub use crate::sys_common::fs::exists;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -250,15 +250,15 @@ impl File {
     }
 
     pub fn duplicate(&self) -> io::Result<File> {
-        unsupported()
+        moto_rt::fs::duplicate(self.rt_fd).map(|rt_fd| Self { rt_fd }).map_err(map_moturus_error)
     }
 
-    pub fn set_permissions(&self, _perm: FilePermissions) -> io::Result<()> {
-        unsupported()
+    pub fn set_permissions(&self, perm: FilePermissions) -> io::Result<()> {
+        moto_rt::fs::set_file_perm(self.rt_fd, perm.rt_perm).map_err(map_moturus_error)
     }
 
     pub fn set_times(&self, _times: FileTimes) -> io::Result<()> {
-        unsupported()
+        unsupported()  // Let's not do that.
     }
 }
 

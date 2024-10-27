@@ -1,52 +1,50 @@
-use crate::fmt;
 use crate::io::{self, BorrowedCursor, IoSlice, IoSliceMut};
 use crate::net::{Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr};
 use crate::time::Duration;
-
+use crate::net::SocketAddr::V4;
+use crate::net::SocketAddr::V6;
 use super::map_moturus_error;
 
+pub use moto_rt::netc;
+
+#[derive(Debug)]
 pub struct TcpStream {
-    inner: moto_runtime::net::TcpStream,
+    rt_fd: moto_rt::RtFd
 }
 
 impl TcpStream {
     pub fn connect(addr: io::Result<&SocketAddr>) -> io::Result<TcpStream> {
-        match addr {
-            Ok(addr) => moto_runtime::net::TcpStream::connect(addr)
-                .map(|inner| Self { inner })
-                .map_err(map_moturus_error),
-            Err(err) => Err(err),
-        }
+        let addr = into_netc(addr?);
+        moto_rt::net::tcp_connect(&addr, Duration::MAX).map(|rt_fd| Self{rt_fd}).map_err(map_moturus_error)
     }
 
     pub fn connect_timeout(addr: &SocketAddr, timeout: Duration) -> io::Result<TcpStream> {
-        moto_runtime::net::TcpStream::connect_timeout(addr, timeout)
-            .map(|inner| Self { inner })
-            .map_err(map_moturus_error)
+        let addr = into_netc(addr);
+        moto_rt::net::tcp_connect(&addr, timeout).map(|rt_fd| Self{rt_fd}).map_err(map_moturus_error)
     }
 
     pub fn set_read_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
-        self.inner.set_read_timeout(timeout).map_err(map_moturus_error)
+        moto_rt::net::set_read_timeout(self.rt_fd, timeout).map_err(map_moturus_error)
     }
 
     pub fn set_write_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
-        self.inner.set_write_timeout(timeout).map_err(map_moturus_error)
+        moto_rt::net::set_write_timeout(self.rt_fd, timeout).map_err(map_moturus_error)
     }
 
     pub fn read_timeout(&self) -> io::Result<Option<Duration>> {
-        self.inner.read_timeout().map_err(map_moturus_error)
+        moto_rt::net::read_timeout(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
-        self.inner.write_timeout().map_err(map_moturus_error)
+        moto_rt::net::write_timeout(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.peek(buf).map_err(map_moturus_error)
+        moto_rt::net::peek(self.rt_fd, buf).map_err(map_moturus_error)
     }
 
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(buf).map_err(map_moturus_error)
+        moto_rt::fs::read(self.rt_fd, buf).map_err(map_moturus_error)
     }
 
     pub fn read_buf(&self, cursor: BorrowedCursor<'_>) -> io::Result<()> {
@@ -62,7 +60,7 @@ impl TcpStream {
     }
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.write(buf).map_err(map_moturus_error)
+        moto_rt::fs::write(self.rt_fd, buf).map_err(map_moturus_error)
     }
 
     pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
@@ -74,341 +72,327 @@ impl TcpStream {
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.inner.peer_addr().map_err(map_moturus_error)
+        moto_rt::net::peer_addr(self.rt_fd).map(|addr| from_netc(&addr)).map_err(map_moturus_error)
     }
 
     pub fn socket_addr(&self) -> io::Result<SocketAddr> {
-        self.inner.socket_addr().map_err(map_moturus_error)
+        moto_rt::net::socket_addr(self.rt_fd).map(|addr| from_netc(&addr)).map_err(map_moturus_error)
     }
 
     pub fn shutdown(&self, shutdown: Shutdown) -> io::Result<()> {
-        match shutdown {
-            Shutdown::Read => self.inner.shutdown(true, false).map_err(map_moturus_error),
-            Shutdown::Write => self.inner.shutdown(false, true).map_err(map_moturus_error),
-            Shutdown::Both => self.inner.shutdown(true, true).map_err(map_moturus_error),
-        }
+        let shutdown = match shutdown {
+            Shutdown::Read => moto_rt::net::SHUTDOWN_READ,
+            Shutdown::Write => moto_rt::net::SHUTDOWN_WRITE,
+            Shutdown::Both => moto_rt::net::SHUTDOWN_READ | moto_rt::net::SHUTDOWN_WRITE,
+        };
+
+        moto_rt::net::shutdown(self.rt_fd, shutdown).map_err(map_moturus_error)
     }
 
     pub fn duplicate(&self) -> io::Result<TcpStream> {
-        self.inner.duplicate().map(|inner| Self { inner }).map_err(map_moturus_error)
+        moto_rt::fs::duplicate(self.rt_fd).map(|rt_fd| Self{rt_fd}).map_err(map_moturus_error)
     }
 
-    pub fn set_linger(&self, linger: Option<Duration>) -> io::Result<()> {
-        self.inner.set_linger(linger).map_err(map_moturus_error)
+    pub fn set_linger(&self, timeout: Option<Duration>) -> io::Result<()> {
+        moto_rt::net::set_linger(self.rt_fd, timeout).map_err(map_moturus_error)
     }
 
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        self.inner.linger().map_err(map_moturus_error)
+        moto_rt::net::linger(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        self.inner.set_nodelay(nodelay).map_err(map_moturus_error)
+        moto_rt::net::set_nodelay(self.rt_fd, nodelay).map_err(map_moturus_error)
     }
 
     pub fn nodelay(&self) -> io::Result<bool> {
-        self.inner.nodelay().map_err(map_moturus_error)
+        moto_rt::net::nodelay(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.inner.set_ttl(ttl).map_err(map_moturus_error)
+        moto_rt::net::set_ttl(self.rt_fd, ttl).map_err(map_moturus_error)
     }
 
     pub fn ttl(&self) -> io::Result<u32> {
-        self.inner.ttl().map_err(map_moturus_error)
+        moto_rt::net::ttl(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.inner.take_error().map(|e| e.map(map_moturus_error)).map_err(map_moturus_error)
+        moto_rt::net::take_error(self.rt_fd).map(|e|
+            match e {
+                moto_rt::E_OK => None,
+                e => Some(map_moturus_error(e)),
+            }
+        ).map_err(map_moturus_error)
     }
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.inner.set_nonblocking(nonblocking).map_err(map_moturus_error)
+        moto_rt::net::set_nonblocking(self.rt_fd, nonblocking).map_err(map_moturus_error)
     }
 }
 
-impl fmt::Debug for TcpStream {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
+#[derive(Debug)]
 pub struct TcpListener {
-    inner: moto_runtime::net::TcpListener,
+    rt_fd: moto_rt::RtFd
 }
 
 impl TcpListener {
     pub fn bind(addr: io::Result<&SocketAddr>) -> io::Result<TcpListener> {
-        match addr {
-            Ok(addr) => moto_runtime::net::TcpListener::bind(addr)
-                .map(|inner| Self { inner })
-                .map_err(map_moturus_error),
-            Err(err) => Err(err),
-        }
+        let addr = into_netc(addr?);
+        moto_rt::net::bind(moto_rt::net::PROTO_TCP, &addr).map(|rt_fd| Self{rt_fd}).map_err(map_moturus_error) 
     }
 
     pub fn socket_addr(&self) -> io::Result<SocketAddr> {
-        self.inner.socket_addr().map_err(map_moturus_error)
+        moto_rt::net::socket_addr(self.rt_fd).map(|addr| from_netc(&addr)).map_err(map_moturus_error)
     }
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        self.inner
-            .accept()
-            .map(|(inner, addr)| (TcpStream { inner }, addr))
-            .map_err(map_moturus_error)
+        moto_rt::net::accept(self.rt_fd).map(|(rt_fd, addr)| (TcpStream{rt_fd}, from_netc(&addr))).map_err(map_moturus_error)
     }
 
     pub fn duplicate(&self) -> io::Result<TcpListener> {
-        self.inner.duplicate().map(|inner| Self { inner }).map_err(map_moturus_error)
+        moto_rt::fs::duplicate(self.rt_fd).map(|rt_fd| Self{rt_fd}).map_err(map_moturus_error)
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.inner.set_ttl(ttl).map_err(map_moturus_error)
+        moto_rt::net::set_ttl(self.rt_fd, ttl).map_err(map_moturus_error)
     }
 
     pub fn ttl(&self) -> io::Result<u32> {
-        self.inner.ttl().map_err(map_moturus_error)
+        moto_rt::net::ttl(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
-        self.inner.set_only_v6(only_v6).map_err(map_moturus_error)
+        moto_rt::net::set_only_v6(self.rt_fd, only_v6).map_err(map_moturus_error)
     }
 
     pub fn only_v6(&self) -> io::Result<bool> {
-        self.inner.only_v6().map_err(map_moturus_error)
+        moto_rt::net::only_v6(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.inner.take_error().map(|e| e.map(map_moturus_error)).map_err(map_moturus_error)
+        moto_rt::net::take_error(self.rt_fd).map(|e|
+            match e {
+                moto_rt::E_OK => None,
+                e => Some(map_moturus_error(e)),
+            }
+        ).map_err(map_moturus_error)
     }
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.inner.set_nonblocking(nonblocking).map_err(map_moturus_error)
+        moto_rt::net::set_nonblocking(self.rt_fd, nonblocking).map_err(map_moturus_error)
     }
 }
 
-impl fmt::Debug for TcpListener {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
+#[derive(Debug)]
 pub struct UdpSocket {
-    inner: moto_runtime::net::UdpSocket,
+    rt_fd: moto_rt::RtFd
 }
 
 impl UdpSocket {
     pub fn bind(addr: io::Result<&SocketAddr>) -> io::Result<UdpSocket> {
-        match addr {
-            Ok(addr) => moto_runtime::net::UdpSocket::bind(addr)
-                .map(|inner| Self { inner })
-                .map_err(map_moturus_error),
-            Err(err) => Err(err),
-        }
+        let addr = into_netc(addr?);
+        moto_rt::net::bind(moto_rt::net::PROTO_UDP, &addr).map(|rt_fd| Self{rt_fd}).map_err(map_moturus_error)
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.inner.peer_addr().map_err(map_moturus_error)
+        moto_rt::net::peer_addr(self.rt_fd).map(|addr| from_netc(&addr)).map_err(map_moturus_error)
     }
 
     pub fn socket_addr(&self) -> io::Result<SocketAddr> {
-        self.inner.socket_addr().map_err(map_moturus_error)
+        moto_rt::net::socket_addr(self.rt_fd).map(|addr| from_netc(&addr)).map_err(map_moturus_error)
     }
 
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.inner.recv_from(buf).map_err(map_moturus_error)
+        moto_rt::net::udp_recv_from(self.rt_fd, buf).map(|(sz, addr)| (sz, from_netc(&addr))).map_err(map_moturus_error)
     }
 
     pub fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.inner.peek_from(buf).map_err(map_moturus_error)
+        moto_rt::net::udp_peek_from(self.rt_fd, buf).map(|(sz, addr)| (sz, from_netc(&addr))).map_err(map_moturus_error)
     }
 
     pub fn send_to(&self, buf: &[u8], addr: &SocketAddr) -> io::Result<usize> {
-        self.inner.send_to(buf, addr).map_err(map_moturus_error)
+        let addr = into_netc(addr);
+        moto_rt::net::udp_send_to(self.rt_fd, buf, &addr).map_err(map_moturus_error)
     }
 
     pub fn duplicate(&self) -> io::Result<UdpSocket> {
-        self.inner.duplicate().map(|inner| Self { inner }).map_err(map_moturus_error)
+        moto_rt::fs::duplicate(self.rt_fd).map(|rt_fd| Self{rt_fd}).map_err(map_moturus_error)
     }
 
     pub fn set_read_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
-        self.inner.set_read_timeout(timeout).map_err(map_moturus_error)
+        moto_rt::net::set_read_timeout(self.rt_fd, timeout).map_err(map_moturus_error)
     }
 
     pub fn set_write_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
-        self.inner.set_write_timeout(timeout).map_err(map_moturus_error)
+        moto_rt::net::set_write_timeout(self.rt_fd, timeout).map_err(map_moturus_error)
     }
 
     pub fn read_timeout(&self) -> io::Result<Option<Duration>> {
-        self.inner.read_timeout().map_err(map_moturus_error)
+        moto_rt::net::read_timeout(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
-        self.inner.write_timeout().map_err(map_moturus_error)
+        moto_rt::net::write_timeout(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn set_broadcast(&self, broadcast: bool) -> io::Result<()> {
-        self.inner.set_broadcast(broadcast).map_err(map_moturus_error)
+        moto_rt::net::set_udp_broadcast(self.rt_fd, broadcast).map_err(map_moturus_error)
     }
 
     pub fn broadcast(&self) -> io::Result<bool> {
-        self.inner.broadcast().map_err(map_moturus_error)
+        moto_rt::net::udp_broadcast(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn set_multicast_loop_v4(&self, val: bool) -> io::Result<()> {
-        self.inner.set_multicast_loop_v4(val).map_err(map_moturus_error)
+        moto_rt::net::set_udp_multicast_loop_v4(self.rt_fd, val).map_err(map_moturus_error)
     }
 
     pub fn multicast_loop_v4(&self) -> io::Result<bool> {
-        self.inner.multicast_loop_v4().map_err(map_moturus_error)
+        moto_rt::net::udp_multicast_loop_v4(self.rt_fd).map_err(map_moturus_error)
     }
 
-    pub fn set_multicast_ttl_v4(&self, ttl: u32) -> io::Result<()> {
-        self.inner.set_multicast_ttl_v4(ttl).map_err(map_moturus_error)
+    pub fn set_multicast_ttl_v4(&self, val: u32) -> io::Result<()> {
+        moto_rt::net::set_udp_multicast_ttl_v4(self.rt_fd, val).map_err(map_moturus_error)
     }
 
     pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
-        self.inner.multicast_ttl_v4().map_err(map_moturus_error)
+        moto_rt::net::udp_multicast_ttl_v4(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn set_multicast_loop_v6(&self, val: bool) -> io::Result<()> {
-        self.inner.set_multicast_loop_v6(val).map_err(map_moturus_error)
+        moto_rt::net::set_udp_multicast_loop_v6(self.rt_fd, val).map_err(map_moturus_error)
     }
 
     pub fn multicast_loop_v6(&self) -> io::Result<bool> {
-        self.inner.multicast_loop_v6().map_err(map_moturus_error)
+        moto_rt::net::udp_multicast_loop_v6(self.rt_fd).map_err(map_moturus_error)
     }
 
-    pub fn join_multicast_v4(&self, addr1: &Ipv4Addr, addr2: &Ipv4Addr) -> io::Result<()> {
-        self.inner.join_multicast_v4(addr1, addr2).map_err(map_moturus_error)
+    pub fn join_multicast_v4(&self, addr: &Ipv4Addr, iface: &Ipv4Addr) -> io::Result<()> {
+        use crate::sys_common::IntoInner;
+
+        let addr = addr.into_inner();
+        let iface = iface.into_inner();
+        moto_rt::net::join_udp_multicast_v4(self.rt_fd, &addr, &iface).map_err(map_moturus_error)
     }
 
-    pub fn join_multicast_v6(&self, addr1: &Ipv6Addr, val: u32) -> io::Result<()> {
-        self.inner.join_multicast_v6(addr1, val).map_err(map_moturus_error)
+    pub fn join_multicast_v6(&self, addr: &Ipv6Addr, iface: u32) -> io::Result<()> {
+        use crate::sys_common::IntoInner;
+
+        let addr = addr.into_inner();
+        moto_rt::net::join_udp_multicast_v6(self.rt_fd, &addr, iface).map_err(map_moturus_error)
     }
 
-    pub fn leave_multicast_v4(&self, addr1: &Ipv4Addr, addr2: &Ipv4Addr) -> io::Result<()> {
-        self.inner.leave_multicast_v4(addr1, addr2).map_err(map_moturus_error)
+    pub fn leave_multicast_v4(&self, addr: &Ipv4Addr, iface: &Ipv4Addr) -> io::Result<()> {
+        use crate::sys_common::IntoInner;
+
+        let addr = addr.into_inner();
+        let iface = iface.into_inner();
+        moto_rt::net::leave_udp_multicast_v4(self.rt_fd, &addr, &iface).map_err(map_moturus_error)
     }
 
-    pub fn leave_multicast_v6(&self, addr1: &Ipv6Addr, val: u32) -> io::Result<()> {
-        self.inner.leave_multicast_v6(addr1, val).map_err(map_moturus_error)
+    pub fn leave_multicast_v6(&self, addr: &Ipv6Addr, iface: u32) -> io::Result<()> {
+        use crate::sys_common::IntoInner;
+
+        let addr = addr.into_inner();
+        moto_rt::net::leave_udp_multicast_v6(self.rt_fd, &addr, iface).map_err(map_moturus_error)
     }
 
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.inner.set_ttl(ttl).map_err(map_moturus_error)
+        moto_rt::net::set_ttl(self.rt_fd, ttl).map_err(map_moturus_error)
     }
 
     pub fn ttl(&self) -> io::Result<u32> {
-        self.inner.ttl().map_err(map_moturus_error)
+        moto_rt::net::ttl(self.rt_fd).map_err(map_moturus_error)
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.inner.take_error().map(|e| e.map(map_moturus_error)).map_err(map_moturus_error)
+        moto_rt::net::take_error(self.rt_fd).map(|e|
+            match e {
+                moto_rt::E_OK => None,
+                e => Some(map_moturus_error(e)),
+            }
+        ).map_err(map_moturus_error)
     }
 
-    pub fn set_nonblocking(&self, val: bool) -> io::Result<()> {
-        self.inner.set_nonblocking(val).map_err(map_moturus_error)
+    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        moto_rt::net::set_nonblocking(self.rt_fd, nonblocking).map_err(map_moturus_error)
     }
 
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.recv(buf).map_err(map_moturus_error)
+        moto_rt::fs::read(self.rt_fd, buf).map_err(map_moturus_error)
     }
 
     pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.peek(buf).map_err(map_moturus_error)
+        moto_rt::net::peek(self.rt_fd, buf).map_err(map_moturus_error)
     }
 
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.send(buf).map_err(map_moturus_error)
+        moto_rt::fs::write(self.rt_fd, buf).map_err(map_moturus_error)
     }
 
     pub fn connect(&self, addr: io::Result<&SocketAddr>) -> io::Result<()> {
-        match addr {
-            Ok(addr) => self.inner.connect(addr).map_err(map_moturus_error),
-            Err(err) => Err(err),
-        }
+        let addr = into_netc(addr?);
+        moto_rt::net::udp_connect(&addr).map_err(map_moturus_error)
     }
 }
-
-impl fmt::Debug for UdpSocket {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// get_host_addresses
-////////////////////////////////////////////////////////////////////////////////
 
 pub struct LookupHost {
-    inner: moto_runtime::net::LookupHost,
+    port: u16,
+    addresses: alloc::collections::VecDeque<netc::sockaddr>,
 }
 
 impl LookupHost {
     pub fn port(&self) -> u16 {
-        self.inner.port()
+        self.port
     }
 }
 
 impl Iterator for LookupHost {
     type Item = SocketAddr;
     fn next(&mut self) -> Option<SocketAddr> {
-        self.inner.next()
+        self.addresses.pop_front().map(|addr| from_netc(&addr))
     }
 }
 
 impl TryFrom<&str> for LookupHost {
     type Error = io::Error;
 
-    fn try_from(v: &str) -> io::Result<LookupHost> {
-        moto_runtime::net::LookupHost::try_from(v)
-            .map(|inner| Self { inner })
-            .map_err(map_moturus_error)
+    fn try_from(host_port: &str) -> io::Result<LookupHost> {
+        let (host, port_str) = host_port.rsplit_once(':').ok_or(moto_rt::E_INVALID_ARGUMENT).map_err(map_moturus_error)?;
+        let port: u16 = port_str.parse().map_err(|_| moto_rt::E_INVALID_ARGUMENT).map_err(map_moturus_error)?;
+        (host, port).try_into()
     }
 }
 
 impl<'a> TryFrom<(&'a str, u16)> for LookupHost {
     type Error = io::Error;
 
-    fn try_from(v: (&'a str, u16)) -> io::Result<LookupHost> {
-        moto_runtime::net::LookupHost::try_from(v)
-            .map(|inner| Self { inner })
-            .map_err(map_moturus_error)
+    fn try_from(host_port: (&'a str, u16)) -> io::Result<LookupHost> {
+        let (host, port) = host_port;
+
+        let (port, addresses) = moto_rt::net::lookup_host(host, port).map_err(map_moturus_error)?;
+        Ok(LookupHost{ port, addresses })
     }
 }
 
-#[allow(nonstandard_style, unused)]
-pub mod netc {
-    pub const AF_INET: u8 = 0;
-    pub const AF_INET6: u8 = 1;
-    pub type sa_family_t = u8;
+fn into_netc(addr: &SocketAddr) -> netc::sockaddr {
+    use crate::sys_common::IntoInner;
 
-    #[derive(Copy, Clone)]
-    pub struct in_addr {
-        pub s_addr: u32,
+    match addr {
+        V4(addr4) => netc::sockaddr { v4: addr4.into_inner() },
+        V6(addr6) => netc::sockaddr { v6: addr6.into_inner() },
     }
+}
 
-    #[derive(Copy, Clone)]
-    pub struct sockaddr_in {
-        pub sin_family: sa_family_t,
-        pub sin_port: u16,
-        pub sin_addr: in_addr,
+fn from_netc(addr: &netc::sockaddr) -> SocketAddr {
+    use crate::sys_common::FromInner;
+
+    unsafe {
+        match addr.v4.sin_family {
+            netc::AF_INET => SocketAddr::V4(crate::net::SocketAddrV4::from_inner(addr.v4)),
+            netc::AF_INET6 => SocketAddr::V6(crate::net::SocketAddrV6::from_inner(addr.v6)),
+            _ => panic!("bad sin_family {}", addr.v4.sin_family)
+        }
     }
-
-    #[derive(Copy, Clone)]
-    pub struct in6_addr {
-        pub s6_addr: [u8; 16],
-    }
-
-    #[derive(Copy, Clone)]
-    pub struct sockaddr_in6 {
-        pub sin6_family: sa_family_t,
-        pub sin6_port: u16,
-        pub sin6_addr: in6_addr,
-        pub sin6_flowinfo: u32,
-        pub sin6_scope_id: u32,
-    }
-
-    // #[derive(Copy, Clone)]
-    // pub struct sockaddr {}
 }

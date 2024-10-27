@@ -150,23 +150,19 @@ impl From<super::io_pipe::IoPipe> for Stdio {
 
 impl From<File> for Stdio {
     fn from(_file: File) -> Stdio {
-        panic!("unsupported")
+        todo!()
     }
 }
 
 impl From<io::Stdout> for Stdio {
     fn from(_: io::Stdout) -> Stdio {
-        // FIXME: This is wrong.
-        // Instead, the Stdio we have here should be a unit struct.
-        panic!("unsupported")
+        todo!()
     }
 }
 
 impl From<io::Stderr> for Stdio {
     fn from(_: io::Stderr) -> Stdio {
-        // FIXME: This is wrong.
-        // Instead, the Stdio we have here should be a unit struct.
-        panic!("unsupported")
+        todo!()
     }
 }
 

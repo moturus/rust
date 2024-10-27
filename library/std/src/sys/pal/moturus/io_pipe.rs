@@ -1,7 +1,6 @@
 use super::map_moturus_error;
 use crate::fmt;
 use crate::io::{self, BorrowedCursor, IoSlice, IoSliceMut};
-use crate::sys::unsupported;
 
 pub struct IoPipe {
     pub(crate) rt_fd: moto_rt::RtFd,
@@ -28,8 +27,8 @@ impl IoPipe {
         moto_rt::fs::read(self.rt_fd, buf).map_err(map_moturus_error)
     }
 
-    pub fn read_buf(&self, _buf: BorrowedCursor<'_>) -> io::Result<()> {
-        unsupported()
+    pub fn read_buf(&self, cursor: BorrowedCursor<'_>) -> io::Result<()> {
+        crate::io::default_read_buf(|buf| self.read(buf), cursor)
     }
 
     pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
