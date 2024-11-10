@@ -12,6 +12,12 @@ pub struct TcpStream {
     rt_fd: moto_rt::RtFd
 }
 
+impl Drop for TcpStream {
+    fn drop(&mut self) {
+        moto_rt::fs::close(self.rt_fd).unwrap();
+    }
+}
+
 impl TcpStream {
     pub fn connect(addr: io::Result<&SocketAddr>) -> io::Result<TcpStream> {
         let addr = into_netc(addr?);
@@ -134,6 +140,12 @@ impl TcpStream {
 #[derive(Debug)]
 pub struct TcpListener {
     rt_fd: moto_rt::RtFd
+}
+
+impl Drop for TcpListener {
+    fn drop(&mut self) {
+        moto_rt::fs::close(self.rt_fd).unwrap();
+    }
 }
 
 impl TcpListener {
