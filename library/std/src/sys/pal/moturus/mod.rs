@@ -3,6 +3,7 @@
 pub mod alloc;
 pub mod args;
 pub mod env;
+pub mod fd;
 pub mod fs;
 pub mod io;
 mod io_pipe;

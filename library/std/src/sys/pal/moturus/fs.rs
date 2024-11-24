@@ -6,6 +6,12 @@ use crate::path::{Path, PathBuf};
 use crate::sys::unsupported;
 use crate::sys::time::SystemTime;
 pub use crate::sys_common::fs::exists;
+use crate::os::fd::RawFd;
+use crate::os::fd::{AsFd, AsRawFd, BorrowedFd};
+use crate::os::fd::FromRawFd;
+use crate::os::fd::IntoRawFd;
+use crate::sys_common::{AsInner, AsInnerMut, FromInner, IntoInner};
+use crate::sys::fd::FileDesc;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FileType {
@@ -162,48 +168,36 @@ impl OpenOptions {
 }
 
 #[derive(Debug)]
-pub struct File {
-    rt_fd: moto_rt::RtFd,
-}
-
-impl Drop for File {
-    fn drop(&mut self) {
-        moto_rt::fs::close(self.rt_fd).unwrap();
-    }
-}
+pub struct File(FileDesc);
 
 impl File {
     pub fn open(path: &Path, opts: &OpenOptions) -> io::Result<File> {
         let path = path.to_str().ok_or(io::Error::from(io::ErrorKind::InvalidFilename))?;
         moto_rt::fs::open(path, opts.rt_open_options)
-            .map(|rt_fd| Self { rt_fd })
+            .map(|fd| unsafe { Self::from_raw_fd(fd) })
             .map_err(map_moturus_error)
     }
 
     pub fn file_attr(&self) -> io::Result<FileAttr> {
-        moto_rt::fs::get_file_attr(self.rt_fd)
+        moto_rt::fs::get_file_attr(self.as_raw_fd())
             .map(|inner| -> FileAttr { FileAttr { inner } })
             .map_err(map_moturus_error)
     }
 
     pub fn fsync(&self) -> io::Result<()> {
-        moto_rt::fs::fsync(self.rt_fd).map_err(map_moturus_error)
+        moto_rt::fs::fsync(self.as_raw_fd()).map_err(map_moturus_error)
     }
 
     pub fn datasync(&self) -> io::Result<()> {
-        moto_rt::fs::datasync(self.rt_fd).map_err(map_moturus_error)
+        moto_rt::fs::datasync(self.as_raw_fd()).map_err(map_moturus_error)
     }
 
     pub fn truncate(&self, size: u64) -> io::Result<()> {
-        moto_rt::fs::truncate(self.rt_fd, size).map_err(map_moturus_error)
+        moto_rt::fs::truncate(self.as_raw_fd(), size).map_err(map_moturus_error)
     }
 
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        moto_rt::fs::read(self.rt_fd, buf).map_err(map_moturus_error)
-    }
-
-    pub fn is_terminal(&self) -> bool {
-        moto_rt::fs::is_terminal(self.rt_fd)
+        moto_rt::fs::read(self.as_raw_fd(), buf).map_err(map_moturus_error)
     }
 
     pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
@@ -219,7 +213,7 @@ impl File {
     }
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        moto_rt::fs::write(self.rt_fd, buf).map_err(map_moturus_error)
+        moto_rt::fs::write(self.as_raw_fd(), buf).map_err(map_moturus_error)
     }
 
     pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
@@ -231,30 +225,31 @@ impl File {
     }
 
     pub fn flush(&self) -> io::Result<()> {
-        moto_rt::fs::flush(self.rt_fd).map_err(map_moturus_error)
+        moto_rt::fs::flush(self.as_raw_fd()).map_err(map_moturus_error)
     }
 
     pub fn seek(&self, pos: SeekFrom) -> io::Result<u64> {
         match pos {
             SeekFrom::Start(offset) => {
-                moto_rt::fs::seek(self.rt_fd, offset as i64, moto_rt::fs::SEEK_SET)
+                moto_rt::fs::seek(self.as_raw_fd(), offset as i64, moto_rt::fs::SEEK_SET)
                     .map_err(map_moturus_error)
             }
-            SeekFrom::End(offset) => moto_rt::fs::seek(self.rt_fd, offset, moto_rt::fs::SEEK_END)
+            SeekFrom::End(offset) => moto_rt::fs::seek(self.as_raw_fd(), offset, moto_rt::fs::SEEK_END)
                 .map_err(map_moturus_error),
             SeekFrom::Current(offset) => {
-                moto_rt::fs::seek(self.rt_fd, offset, moto_rt::fs::SEEK_CUR)
+                moto_rt::fs::seek(self.as_raw_fd(), offset, moto_rt::fs::SEEK_CUR)
                     .map_err(map_moturus_error)
             }
         }
     }
 
     pub fn duplicate(&self) -> io::Result<File> {
-        moto_rt::fs::duplicate(self.rt_fd).map(|rt_fd| Self { rt_fd }).map_err(map_moturus_error)
+        moto_rt::fs::duplicate(self.as_raw_fd())
+            .map(|fd| unsafe { Self::from_raw_fd(fd) }).map_err(map_moturus_error)
     }
 
     pub fn set_permissions(&self, perm: FilePermissions) -> io::Result<()> {
-        moto_rt::fs::set_file_perm(self.rt_fd, perm.rt_perm).map_err(map_moturus_error)
+        moto_rt::fs::set_file_perm(self.as_raw_fd(), perm.rt_perm).map_err(map_moturus_error)
     }
 
     pub fn set_times(&self, _times: FileTimes) -> io::Result<()> {
@@ -400,5 +395,57 @@ impl DirEntry {
 
     pub fn file_type(&self) -> io::Result<FileType> {
         Ok(FileType { rt_filetype: self.inner.attr.file_type })
+    }
+}
+
+impl AsInner<FileDesc> for File {
+    #[inline]
+    fn as_inner(&self) -> &FileDesc {
+        &self.0
+    }
+}
+
+impl AsInnerMut<FileDesc> for File {
+    #[inline]
+    fn as_inner_mut(&mut self) -> &mut FileDesc {
+        &mut self.0
+    }
+}
+
+impl IntoInner<FileDesc> for File {
+    fn into_inner(self) -> FileDesc {
+        self.0
+    }
+}
+
+impl FromInner<FileDesc> for File {
+    fn from_inner(file_desc: FileDesc) -> Self {
+        Self(file_desc)
+    }
+}
+
+impl AsFd for File {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_fd()
+    }
+}
+
+impl AsRawFd for File {
+    #[inline]
+    fn as_raw_fd(&self) -> RawFd {
+        self.0.as_raw_fd()
+    }
+}
+
+impl IntoRawFd for File {
+    fn into_raw_fd(self) -> RawFd {
+        self.0.into_raw_fd()
+    }
+}
+
+impl FromRawFd for File {
+    unsafe fn from_raw_fd(raw_fd: RawFd) -> Self {
+        Self(FromRawFd::from_raw_fd(raw_fd))
     }
 }

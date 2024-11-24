@@ -1,4 +1,6 @@
 use crate::mem;
+use crate::os::fd::AsFd;
+use crate::os::fd::AsRawFd;
 
 #[derive(Copy, Clone)]
 pub struct IoSlice<'a>(&'a [u8]);
@@ -46,49 +48,7 @@ impl<'a> IoSliceMut<'a> {
     }
 }
 
-pub trait MoturusIsTerminal {
-    fn is_terminal_impl(&self) -> bool;
-}
-
-pub fn is_terminal(val: &impl MoturusIsTerminal) -> bool {
-    val.is_terminal_impl()
-}
-
-impl MoturusIsTerminal for crate::fs::File {
-    fn is_terminal_impl(&self) -> bool {
-        use crate::sys_common::AsInner;
-
-        self.as_inner().is_terminal()
-    }
-}
-
-impl MoturusIsTerminal for crate::io::Stdin {
-    fn is_terminal_impl(&self) -> bool {
-        moto_rt::fs::is_terminal(moto_rt::FD_STDIN)
-    }
-}
-impl MoturusIsTerminal for crate::io::Stdout {
-    fn is_terminal_impl(&self) -> bool {
-        moto_rt::fs::is_terminal(moto_rt::FD_STDOUT)
-    }
-}
-impl MoturusIsTerminal for crate::io::Stderr {
-    fn is_terminal_impl(&self) -> bool {
-        moto_rt::fs::is_terminal(moto_rt::FD_STDERR)
-    }
-}
-impl MoturusIsTerminal for crate::io::StdinLock<'_> {
-    fn is_terminal_impl(&self) -> bool {
-        moto_rt::fs::is_terminal(moto_rt::FD_STDIN)
-    }
-}
-impl MoturusIsTerminal for crate::io::StdoutLock<'_> {
-    fn is_terminal_impl(&self) -> bool {
-        moto_rt::fs::is_terminal(moto_rt::FD_STDOUT)
-    }
-}
-impl MoturusIsTerminal for crate::io::StderrLock<'_> {
-    fn is_terminal_impl(&self) -> bool {
-        moto_rt::fs::is_terminal(moto_rt::FD_STDERR)
-    }
+pub fn is_terminal(fd: &impl AsFd) -> bool {
+    let fd = fd.as_fd();
+    moto_rt::fs::is_terminal(fd.as_raw_fd())
 }

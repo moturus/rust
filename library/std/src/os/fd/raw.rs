@@ -18,6 +18,11 @@ use crate::os::wasi::io::OwnedFd;
 use crate::sys_common::{AsInner, IntoInner};
 use crate::{fs, io};
 
+#[cfg(target_os = "moturus")]
+use moto_rt::libc;
+#[cfg(target_os = "moturus")]
+use super::owned::OwnedFd;
+
 /// Raw file descriptors.
 #[rustc_allowed_through_unstable_modules]
 #[stable(feature = "rust1", since = "1.0.0")]
