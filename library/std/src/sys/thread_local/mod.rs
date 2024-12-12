@@ -170,6 +170,13 @@ pub(crate) mod key {
             pub(crate) use xous::destroy_tls;
             pub(super) use xous::{Key, get, set};
             use xous::{create, destroy};
+        } else if #[cfg(target_os = "moturus")] {
+            mod racy;
+            #[cfg(test)]
+            mod tests;
+            pub(super) use racy::LazyKey;
+            pub(super) use moto_rt::tls::{Key, get, set};
+            use moto_rt::tls::{create, destroy};
         }
     }
 }

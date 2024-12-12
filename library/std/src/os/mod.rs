@@ -178,7 +178,7 @@ pub mod vxworks;
 #[cfg(target_os = "xous")]
 pub mod xous;
 
-#[cfg(any(unix, target_os = "hermit", target_os = "wasi", doc))]
+#[cfg(any(unix, target_os = "hermit", target_os = "wasi", target_os = "moturus", doc))]
 pub mod fd;
 
 #[cfg(any(target_os = "linux", target_os = "android", doc))]

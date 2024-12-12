@@ -2328,7 +2328,7 @@ impl Path {
             self.has_root() || has_redox_scheme(self.as_u8_slice())
         } else {
             self.has_root()
-                && (cfg!(any(unix, target_os = "hermit", target_os = "wasi"))
+                && (cfg!(any(unix, target_os = "hermit", target_os = "moturus", target_os = "wasi"))
                     || self.prefix().is_some())
         }
     }
