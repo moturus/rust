@@ -34,14 +34,14 @@ impl TcpStream {
 
     pub fn connect(addr: io::Result<&SocketAddr>) -> io::Result<TcpStream> {
         let addr = into_netc(addr?);
-        moto_rt::net::tcp_connect(&addr, Duration::MAX)
+        moto_rt::net::tcp_connect(&addr, Duration::MAX, false)
             .map(|fd| Self { inner: unsafe { Socket::from_raw_fd(fd) }})
             .map_err(map_moturus_error)
     }
 
     pub fn connect_timeout(addr: &SocketAddr, timeout: Duration) -> io::Result<TcpStream> {
         let addr = into_netc(addr);
-        moto_rt::net::tcp_connect(&addr, timeout)
+        moto_rt::net::tcp_connect(&addr, timeout, false)
             .map(|fd| Self { inner: unsafe { Socket::from_raw_fd(fd) }})
             .map_err(map_moturus_error)
     }
