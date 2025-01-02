@@ -75,11 +75,12 @@ impl TcpStream {
     }
 
     pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        crate::io::default_read_vectored(|b| self.read(b), bufs)
+        let bufs: &mut [&mut [u8]] = unsafe { core::mem::transmute(bufs) };
+        moto_rt::fs::read_vectored(self.inner.as_raw_fd(), bufs).map_err(map_moturus_error)
     }
 
     pub fn is_read_vectored(&self) -> bool {
-        false
+        true
     }
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
@@ -87,11 +88,12 @@ impl TcpStream {
     }
 
     pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        crate::io::default_write_vectored(|b| self.write(b), bufs)
+        let bufs: &[&[u8]] = unsafe { core::mem::transmute(bufs) };
+        moto_rt::fs::write_vectored(self.inner.as_raw_fd(), bufs).map_err(map_moturus_error)
     }
 
     pub fn is_write_vectored(&self) -> bool {
-        false
+        true
     }
 
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {

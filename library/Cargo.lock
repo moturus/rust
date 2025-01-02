@@ -189,9 +189,9 @@ dependencies = [
 
 [[package]]
 name = "moto-rt"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81c62f4baf88322980b8c231aec17c1e9ab3254ea433878453bb4a13fc680a87"
+checksum = "f65912f75a02202e32b1a72d66663bc1e2d9abfd6fa2cf7db1a65b728349e8f0"
 dependencies = [
  "compiler_builtins",
  "rustc-std-workspace-alloc",
