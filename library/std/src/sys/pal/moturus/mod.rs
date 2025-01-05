@@ -70,26 +70,7 @@ pub extern "C" fn __rust_abort() {
     moto_rt::process::exit(-1)
 }
 
-fn map_moturus_error(err: moto_rt::ErrorCode) -> crate::io::Error {
-    use moto_rt::error::*;
-
-    use crate::io::ErrorKind;
-
-    let kind: ErrorKind = match err {
-        E_ALREADY_IN_USE => ErrorKind::AlreadyExists,
-        E_INVALID_FILENAME => ErrorKind::InvalidFilename,
-        E_NOT_FOUND => ErrorKind::NotFound,
-        E_TIMED_OUT => ErrorKind::TimedOut,
-        E_NOT_IMPLEMENTED => ErrorKind::Unsupported,
-        E_FILE_TOO_LARGE => ErrorKind::FileTooLarge,
-        E_UNEXPECTED_EOF => ErrorKind::UnexpectedEof,
-        E_INVALID_ARGUMENT => ErrorKind::InvalidData,
-        E_NOT_READY => ErrorKind::WouldBlock,
-        _ => ErrorKind::Other,
-    };
-
-    crate::io::Error::from(kind)
-}
+pub(crate) use crate::os::moturus::map_moturus_error;
 
 pub fn is_interrupted(_code: i32) -> bool {
     false
