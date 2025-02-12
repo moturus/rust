@@ -26,7 +26,14 @@ pub(crate) fn opts() -> TargetOptions {
         main_needs_argc_argv: true,
         panic_strategy: PanicStrategy::Abort,
         pre_link_args,
-        stack_probes: StackProbeType::Inline,
+        // stack_probes: StackProbeType::Inline,
+        //
+        // Note: stack probes and stack protector are disabled below
+        //       because this way more crashes are happening for some reason,
+        //       and at this point (development) we want to see more
+        //       crashes (so that we can fix them).
+        stack_probes: StackProbeType::None,
+        supports_stack_protector: false,
         ..Default::default()
     }
 }
