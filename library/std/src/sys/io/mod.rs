@@ -8,6 +8,8 @@ mod io_slice {
         } else if #[cfg(target_os = "windows")] {
             mod windows;
             pub use windows::*;
+        } else if #[cfg(target_os = "moturus")] {
+            pub use crate::sys::pal::io::{IoSlice, IoSliceMut};
         } else if #[cfg(target_os = "wasi")] {
             mod wasi;
             pub use wasi::*;
@@ -29,6 +31,8 @@ mod is_terminal {
         } else if #[cfg(target_os = "hermit")] {
             mod hermit;
             pub use hermit::*;
+        } else if #[cfg(target_os = "moturus")] {
+            pub use crate::sys::pal::io::is_terminal;
         } else {
             mod unsupported;
             pub use unsupported::*;

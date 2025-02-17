@@ -30,6 +30,10 @@ cfg_if::cfg_if! {
             mod uefi;
             pub use uefi::*;
         }
+    } else if #[cfg(target_os = "moturus")] {
+        mod connection {
+            pub use crate::sys::pal::net::*;
+        }
     } else {
         mod connection {
             mod unsupported;
