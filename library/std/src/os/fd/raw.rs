@@ -21,6 +21,11 @@ use crate::os::wasi::io::OwnedFd;
 #[cfg(not(target_os = "trusty"))]
 use crate::sys_common::{AsInner, FromInner, IntoInner};
 
+#[cfg(target_os = "moturus")]
+use moto_rt::libc;
+#[cfg(target_os = "moturus")]
+use super::owned::OwnedFd;
+
 /// Raw file descriptors.
 #[stable(feature = "rust1", since = "1.0.0")]
 #[cfg(not(target_os = "hermit"))]

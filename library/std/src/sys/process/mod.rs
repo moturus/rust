@@ -5,6 +5,8 @@ cfg_if::cfg_if! {
     } else if #[cfg(target_os = "windows")] {
         mod windows;
         use windows as imp;
+    } else if #[cfg(target_os = "moturus")] {
+        use crate::sys::pal::process as imp;
     } else if #[cfg(target_os = "uefi")] {
         mod uefi;
         use uefi as imp;
