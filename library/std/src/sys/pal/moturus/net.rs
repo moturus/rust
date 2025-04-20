@@ -379,7 +379,7 @@ impl UdpSocket {
 
     pub fn connect(&self, addr: io::Result<&SocketAddr>) -> io::Result<()> {
         let addr = into_netc(addr?);
-        moto_rt::net::udp_connect(&addr).map_err(map_moturus_error)
+        moto_rt::net::udp_connect(self.inner.as_raw_fd(), &addr).map_err(map_moturus_error)
     }
 }
 
