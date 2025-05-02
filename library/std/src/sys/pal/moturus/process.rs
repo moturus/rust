@@ -4,7 +4,9 @@ pub use crate::ffi::OsString as EnvKey;
 use crate::num::NonZeroI32;
 use crate::path::Path;
 use crate::sys::fs::File;
+use crate::os::fd::FromRawFd;
 use crate::os::fd::IntoRawFd;
+use crate::sys_common::{AsInner, FromInner};
 use crate::sys_common::process::{CommandEnv, CommandEnvs};
 use crate::{fmt, io};
 
@@ -12,24 +14,32 @@ use crate::{fmt, io};
 // Command
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
 pub enum Stdio {
     Inherit,
     Null,
     MakePipe,
-    Fd(moto_rt::RtFd),
+    Fd(crate::sys::fd::FileDesc),
 }
 
 impl Stdio {
-    fn to_rt(&self) -> moto_rt::RtFd {
+    fn into_rt(self) -> moto_rt::RtFd {
         match self {
             Stdio::Inherit => moto_rt::process::STDIO_INHERIT,
             Stdio::Null => moto_rt::process::STDIO_NULL,
             Stdio::MakePipe => moto_rt::process::STDIO_MAKE_PIPE,
-            Stdio::Fd(rt_fd) => {
-                assert!(*rt_fd >= 0);
-                *rt_fd
+            Stdio::Fd(fd) => {
+                fd.into_raw_fd()
             }
+        }
+    }
+
+    fn try_clone(&self) -> io::Result<Self> {
+        match self {
+            Self::Fd(fd) => Ok(Self::Fd(crate::sys::fd::FileDesc::from_inner(
+                fd.as_inner().try_clone()?))),
+            Self::Inherit => Ok(Self::Inherit),
+            Self::Null => Ok(Self::Null),
+            Self::MakePipe => Ok(Self::MakePipe),
         }
     }
 }
@@ -102,13 +112,23 @@ impl Command {
         default: Stdio,
         needs_stdin: bool,
     ) -> io::Result<(Process, StdioPipes)> {
-        let stdin = self
-            .stdin
-            .clone()
-            .unwrap_or(if needs_stdin { default.clone() } else { Stdio::Null })
-            .to_rt();
-        let stdout = self.stdout.clone().unwrap_or(default.clone()).to_rt();
-        let stderr = self.stderr.clone().unwrap_or(default.clone()).to_rt();
+        let stdin = if let Some(stdin) = self.stdin.as_ref() {
+            stdin.try_clone()?.into_rt()
+        } else if needs_stdin {
+            default.try_clone()?.into_rt()
+        } else {
+            Stdio::Null.into_rt()
+        };
+        let stdout = if let Some(stdout) = self.stdout.as_ref() {
+            stdout.try_clone()?.into_rt()
+        } else {
+            default.try_clone()?.into_rt()
+        };
+        let stderr = if let Some(stderr) = self.stdout.as_ref() {
+            stderr.try_clone()?.into_rt()
+        } else {
+            default.try_clone()?.into_rt()
+        };
 
         let mut env = Vec::<(String, String)>::new();
         for (k, v) in self.env.capture() {
@@ -145,7 +165,7 @@ impl Command {
 
 impl From<super::io_pipe::IoPipe> for Stdio {
     fn from(pipe: super::io_pipe::IoPipe) -> Stdio {
-        Stdio::Fd(pipe.into_raw_fd())
+        unsafe { Stdio::Fd(crate::sys::fd::FileDesc::from_raw_fd(pipe.into_raw_fd())) }
     }
 }
 
