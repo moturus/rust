@@ -279,6 +279,11 @@ impl Process {
             },
         }
     }
+
+    #[allow(unused)]
+    pub fn handle(&self) -> u64 {
+        self.handle
+    }
 }
 
 pub struct CommandArgs<'a> {

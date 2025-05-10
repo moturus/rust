@@ -1,5 +1,8 @@
 #![unstable(feature = "moturus_ext", issue = "none")]
 
+use crate::sealed::Sealed;
+use crate::sys_common::AsInner;
+
 #[unstable(feature = "moturus_ext", issue = "none")]
 pub fn map_moturus_error(err: moto_rt::ErrorCode) -> crate::io::Error {
     use moto_rt::error::*;
@@ -23,3 +26,16 @@ pub fn map_moturus_error(err: moto_rt::ErrorCode) -> crate::io::Error {
     crate::io::Error::from(kind)
 }
 
+#[unstable(feature = "moturus_ext", issue = "none")]
+pub trait ChildExt: Sealed {
+    /// Extracts the main thread raw handle, without taking ownership
+    #[unstable(feature = "moturus_ext", issue = "none")]
+    fn sys_handle(&self) -> u64;
+}
+
+#[unstable(feature = "moturus_ext", issue = "none")]
+impl ChildExt for crate::process::Child {
+    fn sys_handle(&self) -> u64 {
+        self.as_inner().handle()
+    }
+}
