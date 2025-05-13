@@ -63,7 +63,20 @@ pub struct StdioPipes {
 
 impl Command {
     pub fn new(program: &OsStr) -> Command {
-        Command { program: program.to_str().unwrap().to_owned(), ..Default::default() }
+        let mut env = CommandEnv::default();
+        let mut vars = Vec::<(EnvKey, EnvKey)>::new();
+        for (k, v) in env.capture() {
+            if k.clone().into_string().unwrap() !=
+                    moto_rt::process::STDIO_IS_TERMINAL_ENV_KEY {
+                vars.push((k, v));
+            }
+        }
+
+        for (k, v) in vars {
+            env.set(&k, &v);
+        }
+
+        Command { program: program.to_str().unwrap().to_owned(), env, ..Default::default() }
     }
 
     pub fn arg(&mut self, arg: &OsStr) {
@@ -131,8 +144,13 @@ impl Command {
         };
 
         let mut env = Vec::<(String, String)>::new();
-        for (k, v) in self.env.capture() {
-            env.push((k.into_string().unwrap(), v.into_string().unwrap()));
+        for (k, v) in self.env.iter() {
+            let val = if let Some(v) = v {
+                v.to_str().unwrap()
+            } else {
+                ""
+            };
+            env.push((k.to_str().unwrap().to_owned(), val.to_owned()));
         }
 
         let args = moto_rt::process::SpawnArgs {
