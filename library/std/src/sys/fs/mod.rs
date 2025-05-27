@@ -24,6 +24,8 @@ cfg_if::cfg_if! {
     } else if #[cfg(target_os = "hermit")] {
         mod hermit;
         use hermit as imp;
+    } else if #[cfg(target_os = "moturus")] {
+        use crate::sys::pal::fs as imp;
     } else if #[cfg(target_os = "solid_asp3")] {
         mod solid;
         use solid as imp;

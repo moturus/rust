@@ -6,6 +6,7 @@
     all(target_family = "unix", not(any(target_os = "espidf", target_os = "vita"))),
     target_family = "windows",
     target_os = "hermit",
+    target_os = "moturus",
     target_os = "uefi",
     target_os = "wasi",
     target_os = "xous",
@@ -19,6 +20,9 @@ cfg_if::cfg_if! {
     ))] {
         mod unix;
         pub use unix::*;
+    } else if #[cfg(target_os = "moturus")] {
+        mod moturus;
+        pub use moturus::*;
     } else if #[cfg(target_family = "windows")] {
         mod windows;
         pub use windows::*;

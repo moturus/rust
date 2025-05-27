@@ -5,6 +5,7 @@
 #[cfg(any(
     target_family = "unix",
     target_os = "hermit",
+    target_os = "moturus",
     all(target_vendor = "fortanix", target_env = "sgx"),
     target_os = "solid_asp3",
     target_os = "uefi",
@@ -23,6 +24,9 @@ cfg_if::cfg_if! {
     } else if #[cfg(target_os = "hermit")] {
         mod hermit;
         pub use hermit::*;
+    } else if #[cfg(target_os = "moturus")] {
+        mod moturus;
+        pub use moturus::*;
     } else if #[cfg(all(target_vendor = "fortanix", target_env = "sgx"))] {
         mod sgx;
         pub use sgx::*;
