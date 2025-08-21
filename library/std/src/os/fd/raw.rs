@@ -10,7 +10,7 @@ use crate::fs;
 use crate::io;
 #[cfg(target_os = "hermit")]
 use crate::os::hermit::io::OwnedFd;
-#[cfg(not(target_os = "hermit"))]
+#[cfg(all(not(target_os = "hermit"), not(target_os = "moturus")))]
 use crate::os::raw;
 #[cfg(all(doc, not(target_arch = "wasm32")))]
 use crate::os::unix::io::AsFd;
@@ -21,14 +21,22 @@ use crate::os::wasi::io::OwnedFd;
 #[cfg(not(target_os = "trusty"))]
 use crate::sys_common::{AsInner, FromInner, IntoInner};
 
+#[cfg(target_os = "moturus")]
+use moto_rt::libc;
+#[cfg(target_os = "moturus")]
+use super::owned::OwnedFd;
+
 /// Raw file descriptors.
 #[stable(feature = "rust1", since = "1.0.0")]
-#[cfg(not(target_os = "hermit"))]
+#[cfg(all(not(target_os = "hermit"), not(target_os = "moturus")))]
 pub type RawFd = raw::c_int;
 #[stable(feature = "rust1", since = "1.0.0")]
 #[cfg(target_os = "hermit")]
 pub type RawFd = i32;
 
+#[stable(feature = "rust1", since = "1.0.0")]
+#[cfg(target_os = "moturus")]
+pub type RawFd = i32;
 /// A trait to extract the raw file descriptor from an underlying object.
 ///
 /// This is only available on unix and WASI platforms and must be imported in

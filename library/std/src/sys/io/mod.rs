@@ -10,6 +10,9 @@ mod io_slice {
             mod windows;
             pub use windows::*;
         }
+        target_os = "moturus" => {
+            pub use crate::sys::pal::io::{IoSlice, IoSliceMut};
+        }
         target_os = "wasi" => {
             mod wasi;
             pub use wasi::*;
@@ -38,6 +41,9 @@ mod is_terminal {
         target_os = "hermit" => {
             mod hermit;
             pub use hermit::*;
+        }
+        target_os = "moturus" => {
+            pub use crate::sys::pal::io::is_terminal;
         }
         _ => {
             mod unsupported;

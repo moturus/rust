@@ -62,6 +62,10 @@ cfg_select! {
         mod redox;
         pub use redox::fill_bytes;
     }
+    target_os = "moturus" => {
+        mod moturus;
+        pub use moturus::fill_bytes;
+    }
     all(target_vendor = "fortanix", target_env = "sgx") => {
         mod sgx;
         pub use sgx::fill_bytes;

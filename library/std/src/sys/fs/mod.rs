@@ -27,6 +27,9 @@ cfg_select! {
         mod hermit;
         use hermit as imp;
     }
+    target_os = "moturus" => {
+        use crate::sys::pal::fs as imp;
+    }
     target_os = "solid_asp3" => {
         mod solid;
         use solid as imp;

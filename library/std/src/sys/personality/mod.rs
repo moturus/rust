@@ -28,6 +28,12 @@ cfg_select! {
             core::intrinsics::abort()
         }
     }
+    target_os = "moturus" => {
+        #[lang = "eh_personality"]
+        fn rust_eh_personality() {
+            core::intrinsics::abort()
+        }
+    }
     any(
         all(target_family = "windows", target_env = "gnu"),
         target_os = "psp",

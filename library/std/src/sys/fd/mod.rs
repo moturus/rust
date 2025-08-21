@@ -11,6 +11,9 @@ cfg_select! {
         mod hermit;
         pub use hermit::*;
     }
+    target_os = "moturus" => {
+        pub use crate::sys::pal::fd::*;
+    }
     all(target_vendor = "fortanix", target_env = "sgx") => {
         mod sgx;
         pub use sgx::*;

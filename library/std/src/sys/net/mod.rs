@@ -35,6 +35,11 @@ cfg_select! {
             pub use uefi::*;
         }
     }
+    target_os = "moturus" => {
+        mod connection {
+            pub use crate::sys::pal::net::*;
+        }
+    }
     _ => {
         mod connection {
             mod unsupported;

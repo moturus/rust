@@ -9,6 +9,9 @@ cfg_select! {
         mod windows;
         pub use windows::{AnonPipe, pipe};
     }
+    target_os = "moturus" => {
+        pub use crate::sys::pipe::{AnonPipe, pipe};
+    }
     _ => {
         mod unsupported;
         pub use unsupported::{AnonPipe, pipe};

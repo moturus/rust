@@ -25,6 +25,9 @@ cfg_select! {
         mod trusty;
         pub use trusty::*;
     }
+    target_os = "moturus" => {
+        pub use crate::sys::pal::stdio::*;
+    }
     target_os = "uefi" => {
         mod uefi;
         pub use uefi::*;

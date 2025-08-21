@@ -155,6 +155,8 @@ pub mod ios;
 pub mod l4re;
 #[cfg(target_os = "macos")]
 pub mod macos;
+#[cfg(target_os = "moturus")]
+pub mod moturus;
 #[cfg(target_os = "netbsd")]
 pub mod netbsd;
 #[cfg(target_os = "nto")]
@@ -182,8 +184,9 @@ pub mod vxworks;
 #[cfg(target_os = "xous")]
 pub mod xous;
 
-#[cfg(any(unix, target_os = "hermit", target_os = "trusty", target_os = "wasi", doc))]
+#[cfg(any(unix, target_os = "hermit", target_os = "trusty", target_os = "wasi", target_os = "moturus", doc))]
 pub mod fd;
 
 #[cfg(any(target_os = "linux", target_os = "android", doc))]
 mod net;
+
