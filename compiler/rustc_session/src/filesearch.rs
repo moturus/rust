@@ -262,6 +262,16 @@ pub unsafe fn dll_path(function: *mut std::ffi::c_void) -> Result<PathBuf, Strin
     Err("dll_path is not supported on WASI".to_string())
 }
 
+#[cfg(target_os = "motor")]
+pub unsafe fn dll_path(_function: *mut std::ffi::c_void) -> Result<PathBuf, String> {
+    // Motor OS is static-only: rustc_driver lives inside the rustc binary at
+    // $sysroot/bin/rustc, so the executable path plays the dll role — the
+    // caller's parent().parent() then lands exactly on the sysroot.
+    // (from_env_args_next() is no help here: it requires argv[0] to be a
+    // symlink, and motor-fs has no symlinks.)
+    std::env::current_exe().map_err(|e| format!("current_exe failed: {e}"))
+}
+
 fn current_dll_path() -> Result<PathBuf, String> {
     use std::sync::OnceLock;
 

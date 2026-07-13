@@ -49,7 +49,8 @@
 #include "llvm/Transforms/Instrumentation/RealtimeSanitizer.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/Scalar/AnnotationRemarks.h"
-#if LLVM_VERSION_GE(23, 0)
+#if LLVM_VERSION_GE(23, 0) && __has_include("llvm/Transforms/Utils/AssignGUID.h")
+#define LLVM_RUST_HAS_ASSIGN_GUID
 #include "llvm/Transforms/Utils/AssignGUID.h"
 #endif
 #include "llvm/Transforms/Utils/CanonicalizeAliases.h"
@@ -958,7 +959,7 @@ extern "C" LLVMRustResult LLVMRustOptimize(
     if (NeedThinLTOBufferPasses) {
       MPM.addPass(CanonicalizeAliasesPass());
       MPM.addPass(NameAnonGlobalPass());
-#if LLVM_VERSION_GE(23, 0)
+#ifdef LLVM_RUST_HAS_ASSIGN_GUID
       MPM.addPass(AssignGUIDPass());
 #endif
     }
@@ -1505,7 +1506,7 @@ extern "C" LLVMRustBuffer *LLVMRustModuleSerialize(LLVMModuleRef M,
       PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
       ModulePassManager MPM;
-#if LLVM_VERSION_GE(23, 0)
+#ifdef LLVM_RUST_HAS_ASSIGN_GUID
       MPM.addPass(AssignGUIDPass());
 #endif
 

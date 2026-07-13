@@ -4,7 +4,10 @@ version = "0.0.0"
 edition = "2024"
 
 [lib]
-crate-type = ["dylib"]
+# rlib in addition to dylib: on targets without dynamic linking (Motor OS)
+# rustc drops the dylib crate type with a warning and the rustc binary links
+# rustc_driver statically from the rlib.
+crate-type = ["dylib", "rlib"]
 
 [dependencies]
 # tidy-alphabetical-start

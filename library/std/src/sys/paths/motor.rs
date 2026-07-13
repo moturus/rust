@@ -53,8 +53,8 @@ pub fn chdir(path: &path::Path) -> io::Result<()> {
     moto_rt::fs::chdir(path.as_os_str().as_str()).map_err(map_motor_error)
 }
 
-pub fn home_dir() -> io::Result<PathBuf> {
-    PathBuf::from("/user")
+pub fn home_dir() -> Option<PathBuf> {
+    Some(PathBuf::from("/user"))
 }
 
 pub fn current_exe() -> io::Result<PathBuf> {

@@ -108,7 +108,7 @@ use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rand::{RngCore, rng};
+use rand::{Rng, rng};
 use rustc_data_structures::base_n::{BaseNString, CASE_INSENSITIVE, ToBaseN};
 use rustc_data_structures::fx::{FxHashSet, FxIndexSet};
 use rustc_data_structures::svh::Svh;
