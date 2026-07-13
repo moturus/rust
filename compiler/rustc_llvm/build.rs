@@ -520,7 +520,11 @@ fn main() {
     }
 
     // C++ runtime library
-    if !target.contains("msvc") {
+    if target.contains("motor") {
+        // Motor OS: the target linker driver (motor-rust-cc) appends the
+        // whole mlibc/libc++ static link group; emitting a stdlib here would
+        // only disturb archive ordering.
+    } else if !target.contains("msvc") {
         if let Some(s) = llvm_static_stdcpp {
             assert!(cxxflags.into_iter().all(|flag| flag != "-stdlib=libc++"));
             let path = PathBuf::from(s);

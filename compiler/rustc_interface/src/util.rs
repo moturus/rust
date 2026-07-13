@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::{env, thread};
 
-use rand::{RngCore, rng};
+use rand::{Rng, rng};
 use rustc_ast as ast;
 use rustc_attr_parsing::ShouldEmit;
 use rustc_codegen_ssa::back::archive::{ArArchiveBuilderBuilder, ArchiveBuilderBuilder};

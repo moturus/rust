@@ -14,5 +14,8 @@ rustc_span = { path = "../rustc_span" }
 rustc_target = { path = "../rustc_target" }
 rustc_trait_selection = { path = "../rustc_trait_selection" }
 tracing = "0.1"
+# default features pull in `rand` (via twox-hash's `std` feature) which on the
+# Motor OS target drags in getrandom 0.2 (unsupported there). We only use the
+# fixed-seed `XxHash64`, which needs neither.
 twox-hash = { version = "1.6.3", default-features = false }
 # tidy-alphabetical-end

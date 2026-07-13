@@ -24,9 +24,10 @@
 	shallow = true
 [submodule "src/llvm-project"]
 	path = src/llvm-project
-	url = https://github.com/rust-lang/llvm-project.git
-	branch = rustc/23.1-2026-07-22
-	shallow = true
+	# Motor OS: LLVM 23 with the Motor triple + Clang Motor ToolChain, the same
+	# checkout build-llvm builds its cross toolchain from (see build-rustc.md).
+	url = https://github.com/moturus/llvm-project.git
+	branch = motor-os-rustc
 [submodule "src/doc/embedded-book"]
 	path = src/doc/embedded-book
 	url = https://github.com/rust-embedded/book.git

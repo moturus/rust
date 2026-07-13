@@ -273,6 +273,16 @@ fn current_dll_path() -> Result<PathBuf, String> {
     Err("current_dll_path is not supported on WASI".to_string())
 }
 
+#[cfg(target_os = "motor")]
+fn current_dll_path() -> Result<PathBuf, String> {
+    // Motor OS is static-only: rustc_driver lives inside the rustc binary at
+    // $sysroot/bin/rustc, so the executable path plays the dll role — the
+    // caller's parent().parent() then lands exactly on the sysroot.
+    // (from_env_args_next() is no help here: it requires argv[0] to be a
+    // symlink, and motor-fs has no symlinks.)
+    std::env::current_exe().map_err(|e| format!("current_exe failed: {e}"))
+}
+
 /// This function checks if sysroot is found using env::args().next(), and if it
 /// is not found, finds sysroot from current rustc_driver dll.
 pub(crate) fn default_sysroot() -> PathBuf {

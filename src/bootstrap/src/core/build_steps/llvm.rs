@@ -662,6 +662,33 @@ impl CommandLineStep for Llvm {
             }
         }
 
+        if target.contains("motor") {
+            // Cross build for Motor OS. The motor-clang wrapper (bootstrap.toml
+            // [target.x86_64-unknown-motor].cc/cxx) drives the Motor clang
+            // toolchain with --sysroot, which automatically completes every
+            // executable link (crt1.o + the mlibc/libc++ static group) — both
+            // for cmake try_compile probes and LLVM's own target executables.
+            cfg.define("LLVM_HOST_TRIPLE", "x86_64-unknown-motor");
+            // The motor-patched config-ix.cmake keys its header-probe branch
+            // off CMAKE_*_COMPILER_TARGET (the wrapper passes --target too;
+            // duplicate identical --target flags are harmless). Without this
+            // the CMAKE_SYSTEM_NAME=Linux branch hardcodes HAVE_SYSEXITS_H=1
+            // and friends, which mlibc does not provide.
+            cfg.define("CMAKE_C_COMPILER_TARGET", "x86_64-unknown-motor");
+            cfg.define("CMAKE_CXX_COMPILER_TARGET", "x86_64-unknown-motor");
+            cfg.define("CMAKE_ASM_COMPILER_TARGET", "x86_64-unknown-motor");
+            // No compression/editline stacks on Motor.
+            cfg.define("LLVM_ENABLE_ZLIB", "OFF");
+            cfg.define("LLVM_ENABLE_ZSTD", "OFF");
+            cfg.define("LLVM_ENABLE_PLUGINS", "OFF");
+            cfg.define("LLVM_ENABLE_THREADS", "ON");
+            // Motor has no dynamic linking: skip the two tools that produce
+            // shared libraries (libLTO.so, libRemarks.so). rustc needs
+            // neither. LLVM_ENABLE_PIC must stay ON (static-PIE).
+            cfg.define("LLVM_TOOL_LTO_BUILD", "OFF");
+            cfg.define("LLVM_TOOL_REMARKS_SHLIB_BUILD", "OFF");
+        }
+
         let llvm_version_suffix = if let Some(ref suffix) = builder.config.llvm_version_suffix {
             // Allow version-suffix="" to not define a version suffix at all.
             if !suffix.is_empty() { Some(suffix.to_string()) } else { None }
@@ -838,6 +865,13 @@ fn configure_cmake(
             cfg.define("CMAKE_SYSTEM_NAME", "Haiku");
         } else if target.contains("solaris") || target.contains("illumos") {
             cfg.define("CMAKE_SYSTEM_NAME", "SunOS");
+        } else if target.contains("motor") {
+            // Motor OS: build as "Linux" to get LLVM_ON_UNIX and the
+            // Unix/*.inc implementations; mlibc is POSIX-shaped and the
+            // motor-patched config-ix.cmake probes headers instead of
+            // assuming the full Linux set. Mirrors the native-toolchain
+            // recipe in motor-os/docs/build-llvm.md (stage 6).
+            cfg.define("CMAKE_SYSTEM_NAME", "Linux");
         } else if target.contains("linux") {
             cfg.define("CMAKE_SYSTEM_NAME", "Linux");
         } else if target.contains("darwin") {

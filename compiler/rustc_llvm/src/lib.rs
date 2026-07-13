@@ -5,7 +5,13 @@
 use std::cell::RefCell;
 use std::{ptr, slice};
 
+#[cfg(not(target_os = "motor"))]
 use libc::size_t;
+// The libc crate's Motor OS module is not wired into rustc's dependency
+// graph; size_t is usize on every Motor target.
+#[cfg(target_os = "motor")]
+#[allow(non_camel_case_types)]
+type size_t = usize;
 
 unsafe extern "C" {
     /// Opaque type that allows C++ code to write bytes to a Rust-side buffer,
