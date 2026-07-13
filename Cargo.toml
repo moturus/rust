@@ -94,3 +94,27 @@ codegen-units = 1
 # For git dependencies, also add your source to ALLOWED_SOURCES in src/tools/tidy/src/extdeps.rs.
 #[patch.crates-io]
 
+# Motor OS port: github.com/moturus forks, branch motor-os-rustc, fetched by
+# cargo — no local clones needed (see motor-os/docs/build-rustc.md). Host
+# targets compile byte-identical upstream code; only target_os = "motor" paths
+# differ.
+#
+# libloading: mlibc ships dlopen/dlsym stubs that fail gracefully at runtime —
+# proc macros and dylib codegen backends are unsupported on a static-only OS.
+# The compiler is on a single libloading version (0.9); rustc_metadata was
+# bumped off 0.8 for that.
+#
+# getrandom needs no fork: upstream supports Motor OS since 0.4.3, and the
+# compiler's only getrandom route for the motor target is rand 0.10+.
+# memmap2 needs no fork: the motor target does not depend on it at all
+# (rustc_data_structures gates it out and falls back to Vec<u8>).
+# moto-rt needs no patch here: std pulls it from crates.io (>= 0.17.0, which
+# carries the weak mem* symbols so mlibc's strong ones win).
+[patch.crates-io]
+libloading = { git = "https://github.com/moturus/rust_libloading.git", branch = "motor-os-rustc" }
+# stacker: use the alloc-based stack guard on Motor (no file/anon mmap).
+stacker = { git = "https://github.com/moturus/stacker.git", branch = "motor-os-rustc" }
+# libc 0.2 series with the Motor OS module.
+libc = { git = "https://github.com/moturus/libc.git", branch = "motor-os-rustc" }
+# ctrlc: Motor OS platform stub (no signals; waiter parks forever).
+ctrlc = { git = "https://github.com/moturus/rust-ctrlc.git", branch = "motor-os-rustc" }

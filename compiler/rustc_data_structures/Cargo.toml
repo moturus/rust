@@ -53,7 +53,9 @@ features = [
 libc = "0.2"
 # tidy-alphabetical-end
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Motor OS has no file mmap; memmap.rs falls back to Vec<u8> there and the
+# crate must not be in the motor target's dependency graph at all.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "motor")))'.dependencies]
 # tidy-alphabetical-start
 memmap2 = "0.2.1"
 # tidy-alphabetical-end
