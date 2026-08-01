@@ -13,6 +13,10 @@ cfg_select! {
         mod linux;
         use linux as imp;
     }
+    target_os = "motor" => {
+        mod motor;
+        use motor as imp;
+    }
     unix => {
         mod unix;
         use unix as imp;
