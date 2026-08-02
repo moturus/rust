@@ -13,8 +13,10 @@ cfg_select! {
         #[expect(dead_code)]
         mod unsupported;
         mod imp {
-            pub use super::motor::{getcwd, chdir, current_exe, temp_dir};
-            pub use super::unsupported::{SplitPaths, split_paths, JoinPathsError, join_paths, home_dir};
+            pub use super::motor::{
+                JoinPathsError, SplitPaths, chdir, current_exe, home_dir, getcwd, join_paths,
+                split_paths, temp_dir,
+            };
         }
     }
     all(target_vendor = "fortanix", target_env = "sgx") => {
