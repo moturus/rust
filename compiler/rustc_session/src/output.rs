@@ -130,10 +130,15 @@ pub fn filename_for_input(
 /// Checks if target supports crate_type as output
 pub fn invalid_output_for_target(sess: &Session, crate_type: CrateType) -> bool {
     if let CrateType::Cdylib | CrateType::Dylib | CrateType::ProcMacro = crate_type {
-        if !sess.target.dynamic_linking {
+        let motor_proc_macro =
+            crate_type == CrateType::ProcMacro && sess.target.os == rustc_target::spec::Os::Motor;
+        if !sess.target.dynamic_linking && !motor_proc_macro {
             return true;
         }
-        if sess.crt_static(Some(crate_type)) && !sess.target.crt_static_allows_dylibs {
+        if sess.crt_static(Some(crate_type))
+            && !sess.target.crt_static_allows_dylibs
+            && !motor_proc_macro
+        {
             return true;
         }
     }

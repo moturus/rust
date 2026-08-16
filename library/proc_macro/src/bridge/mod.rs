@@ -9,6 +9,7 @@
 #![deny(unsafe_code)]
 
 use std::hash::Hash;
+use std::io::{self, Read, Write};
 use std::marker;
 use std::ops::{Bound, Range};
 
@@ -111,6 +112,118 @@ mod symbol;
 use buffer::Buffer;
 pub use panic_message::PanicMessage;
 use rpc::{Decode, Encode};
+
+const STDIO_MAGIC: &[u8] = b"\0rustc-proc-macro-v1\0";
+const STDIO_MAX_PAYLOAD: u64 = 256 * 1024 * 1024;
+const STDIO_INVOKE: u8 = 1;
+const STDIO_RESPONSE: u8 = 2;
+const STDIO_DISPATCH: u8 = 3;
+const STDIO_RESULT: u8 = 4;
+
+fn write_stdio_frame(writer: &mut impl Write, kind: u8, payload: &[u8]) -> io::Result<()> {
+    let len = u64::try_from(payload.len())
+        .map_err(|_| io::Error::other("procedural macro frame is too large"))?;
+    if len > STDIO_MAX_PAYLOAD {
+        return Err(io::Error::other("procedural macro frame exceeds 256 MiB"));
+    }
+    writer.write_all(STDIO_MAGIC)?;
+    writer.write_all(&[kind])?;
+    writer.write_all(&len.to_le_bytes())?;
+    writer.write_all(payload)?;
+    writer.flush()
+}
+
+fn read_stdio_frame(
+    reader: &mut impl Read,
+    mut passthrough: Option<&mut dyn Write>,
+) -> io::Result<Option<(u8, Vec<u8>)>> {
+    let mut matched = 0;
+    loop {
+        let mut byte = [0];
+        let read = reader.read(&mut byte)?;
+        if read == 0 {
+            if matched != 0 {
+                if let Some(output) = passthrough.as_deref_mut() {
+                    output.write_all(&STDIO_MAGIC[..matched])?;
+                    output.flush()?;
+                } else {
+                    return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
+                }
+            }
+            return Ok(None);
+        }
+        if byte[0] == STDIO_MAGIC[matched] {
+            matched += 1;
+            if matched != STDIO_MAGIC.len() {
+                continue;
+            }
+            break;
+        }
+        if let Some(output) = passthrough.as_deref_mut() {
+            output.write_all(&STDIO_MAGIC[..matched])?;
+            matched = 0;
+            if byte[0] == STDIO_MAGIC[0] {
+                matched = 1;
+            } else {
+                output.write_all(&byte)?;
+            }
+        } else {
+            return Err(io::Error::other("invalid procedural macro frame magic"));
+        }
+    }
+    if let Some(output) = passthrough.as_deref_mut() {
+        output.flush()?;
+    }
+    let mut header = [0; 9];
+    reader.read_exact(&mut header)?;
+    let len = u64::from_le_bytes(header[1..].try_into().unwrap());
+    if len > STDIO_MAX_PAYLOAD {
+        return Err(io::Error::other("procedural macro frame exceeds 256 MiB"));
+    }
+    let mut payload = vec![0; usize::try_from(len).unwrap()];
+    reader.read_exact(&mut payload)?;
+    Ok(Some((header[0], payload)))
+}
+
+#[cfg(test)]
+mod stdio_tests {
+    use std::io::Cursor;
+
+    use super::{STDIO_MAGIC, STDIO_RESULT, read_stdio_frame, write_stdio_frame};
+
+    #[test]
+    fn frame_round_trip() {
+        let mut wire = Vec::new();
+        write_stdio_frame(&mut wire, STDIO_RESULT, b"tokens").unwrap();
+
+        let frame = read_stdio_frame(&mut Cursor::new(wire), None).unwrap();
+        assert_eq!(frame, Some((STDIO_RESULT, b"tokens".to_vec())));
+    }
+
+    #[test]
+    fn forwards_bytes_outside_frames() {
+        let mut wire = b"macro output before\n".to_vec();
+        write_stdio_frame(&mut wire, STDIO_RESULT, b"result").unwrap();
+        wire.extend_from_slice(b"macro output after\n");
+
+        let mut reader = Cursor::new(wire);
+        let mut output = Vec::new();
+        let frame = read_stdio_frame(&mut reader, Some(&mut output)).unwrap();
+        assert_eq!(frame, Some((STDIO_RESULT, b"result".to_vec())));
+        assert_eq!(output, b"macro output before\n");
+        assert_eq!(read_stdio_frame(&mut reader, Some(&mut output)).unwrap(), None);
+        assert_eq!(output, b"macro output before\nmacro output after\n");
+    }
+
+    #[test]
+    fn strict_reader_rejects_non_protocol_input() {
+        let error = read_stdio_frame(&mut Cursor::new(b"not a frame"), None).unwrap_err();
+        assert_eq!(error.to_string(), "invalid procedural macro frame magic");
+
+        let error = read_stdio_frame(&mut Cursor::new(&STDIO_MAGIC[..4]), None).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::UnexpectedEof);
+    }
+}
 
 /// Configuration for establishing an active connection between a server and a
 /// client.  The server creates the bridge config (`run_server` in `server.rs`),

@@ -13,6 +13,7 @@ use rustc_session::Session;
 use rustc_span::hygiene::AstPass;
 use rustc_span::source_map::SourceMap;
 use rustc_span::{DUMMY_SP, Ident, Span, kw, sym};
+use rustc_target::spec::Os;
 use smallvec::smallvec;
 use thin_vec::{ThinVec, thin_vec};
 
@@ -82,7 +83,7 @@ pub fn inject(
         return;
     }
 
-    let decls = mk_decls(&mut cx, &macros);
+    let decls = mk_decls(&mut cx, &macros, sess.target.os == Os::Motor);
     krate.items.push(decls);
 }
 
@@ -271,7 +272,11 @@ impl<'a> Visitor<'a> for CollectProcMacros<'a> {
 //              // ...
 //          ];
 //      }
-fn mk_decls(cx: &mut ExtCtxt<'_>, macros: &[ProcMacro]) -> Box<ast::Item> {
+fn mk_decls(
+    cx: &mut ExtCtxt<'_>,
+    macros: &[ProcMacro],
+    include_stdio_main: bool,
+) -> Box<ast::Item> {
     let expn_id = cx.resolver.expansion_for_ast_pass(
         DUMMY_SP,
         AstPass::ProcMacroHarness,
@@ -362,9 +367,12 @@ fn mk_decls(cx: &mut ExtCtxt<'_>, macros: &[ProcMacro]) -> Box<ast::Item> {
         cx.attr_nested_word(sym::allow, sym::deprecated, span),
     ]);
 
-    let block = cx.expr_block(
-        cx.block(span, thin_vec![cx.stmt_item(span, krate), cx.stmt_item(span, decls_static)]),
-    );
+    let mut statements = thin_vec![cx.stmt_item(span, krate), cx.stmt_item(span, decls_static)];
+    if include_stdio_main {
+        let main = mk_stdio_main(cx, span, proc_macro);
+        statements.push(cx.stmt_item(span, main));
+    }
+    let block = cx.expr_block(cx.block(span, statements));
 
     let anon_constant = cx.item_const(
         span,
@@ -377,4 +385,43 @@ fn mk_decls(cx: &mut ExtCtxt<'_>, macros: &[ProcMacro]) -> Box<ast::Item> {
     // Integrate the new item into existing module structures.
     let items = AstFragment::Items(smallvec![anon_constant]);
     cx.monotonic_expander().fully_expand_fragment(items).make_items().pop().unwrap()
+}
+
+fn mk_stdio_main(cx: &ExtCtxt<'_>, span: Span, proc_macro: Ident) -> Box<ast::Item> {
+    let run_stdio_server = cx.expr_path(cx.path(
+        span,
+        vec![
+            proc_macro,
+            Ident::new(sym::bridge, span),
+            Ident::new(sym::client, span),
+            Ident::from_str_and_span("run_stdio_server", span),
+        ],
+    ));
+    let decls = cx.expr_path(cx.path(span, vec![Ident::new(sym::_DECLS, span)]));
+    let call = cx.stmt_expr(cx.expr_call(span, run_stdio_server, thin_vec![decls]));
+    let body = cx.block(span, thin_vec![call]);
+    let ret = cx.ty(span, ast::TyKind::Tup(ThinVec::new()));
+    let decl = cx.fn_decl(ThinVec::new(), ast::FnRetTy::Ty(ret));
+    let sig = ast::FnSig { decl, header: ast::FnHeader::default(), span };
+    let function = ast::ItemKind::Fn(Box::new(ast::Fn {
+        defaultness: ast::Defaultness::Implicit,
+        sig,
+        ident: Ident::from_str_and_span("__rustc_proc_macro_main", span),
+        generics: ast::Generics::default(),
+        contract: None,
+        body: Some(body),
+        define_opaque: None,
+        eii_impl: None,
+    }));
+    Box::new(ast::Item {
+        attrs: thin_vec![
+            cx.attr_word(sym::rustc_main, span),
+            cx.attr_nested_word(sym::doc, sym::hidden, span),
+        ],
+        id: ast::DUMMY_NODE_ID,
+        kind: function,
+        vis: ast::Visibility { span, kind: ast::VisibilityKind::Inherited },
+        span,
+        tokens: None,
+    })
 }
