@@ -2249,6 +2249,7 @@ fn exec_linker(
 
 fn link_output_kind(sess: &Session, crate_type: CrateType) -> LinkOutputKind {
     let kind = match (crate_type, sess.crt_static(Some(crate_type)), sess.relocation_model()) {
+        (CrateType::ProcMacro, _, _) if sess.target.os == Os::Motor => LinkOutputKind::StaticPicExe,
         (CrateType::Executable, _, _) if sess.is_wasi_reactor() => LinkOutputKind::WasiReactorExe,
         (CrateType::Executable, false, RelocModel::Pic | RelocModel::Pie) => {
             LinkOutputKind::DynamicPicExe

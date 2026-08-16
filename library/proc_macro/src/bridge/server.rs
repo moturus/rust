@@ -1,15 +1,20 @@
 //! Server-side traits.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::hash::Hash;
+use std::io::{self, BufReader};
 use std::ops::{Bound, Range};
+use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::AtomicU32;
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::{panic, thread};
 
 use crate::bridge::{
     ApiTags, BridgeConfig, Buffer, Decode, Diagnostic, Encode, ExpnGlobals, Literal, Mark, Marked,
-    PanicMessage, TokenTree, client, handle,
+    PanicMessage, STDIO_DISPATCH, STDIO_INVOKE, STDIO_RESPONSE, STDIO_RESULT, TokenTree, client,
+    handle, read_stdio_frame, write_stdio_frame,
 };
 
 pub(super) struct HandleStore<S: Server> {
@@ -258,7 +263,7 @@ fn run_server<
     strategy: &impl ExecutionStrategy,
     server: S,
     input: I,
-    run_client: extern "C" fn(BridgeConfig<'_>) -> Buffer,
+    client: client::Client,
     force_show_panics: bool,
 ) -> Result<O, PanicMessage> {
     let mut dispatcher = Dispatcher { handle_store: HandleStore::new(), server };
@@ -269,7 +274,14 @@ fn run_server<
     (<ExpnGlobals<MarkedSpan<S>> as Mark>::mark(globals), input)
         .encode(&mut buf, &mut dispatcher.handle_store);
 
-    buf = strategy.run_bridge_and_client(&mut dispatcher, buf, run_client, force_show_panics);
+    buf = match client {
+        client::Client::InProcess { run } => {
+            strategy.run_bridge_and_client(&mut dispatcher, buf, run, force_show_panics)
+        }
+        client::Client::Stdio { executable, index } => {
+            run_stdio_client(&mut dispatcher, buf, executable, index, force_show_panics)
+        }
+    };
 
     Result::decode(&mut &buf[..], &mut dispatcher.handle_store)
 }
@@ -285,8 +297,7 @@ impl client::Client {
     where
         S: Server,
     {
-        let client::Client { run } = *self;
-        run_server(strategy, server, <MarkedTokenStream<S>>::mark(input), run, force_show_panics)
+        run_server(strategy, server, <MarkedTokenStream<S>>::mark(input), *self, force_show_panics)
             .map(|s| <Option<MarkedTokenStream<S>>>::unmark(s).unwrap_or_default())
     }
 
@@ -301,14 +312,148 @@ impl client::Client {
     where
         S: Server,
     {
-        let client::Client { run } = *self;
         run_server(
             strategy,
             server,
             (<MarkedTokenStream<S>>::mark(input), <MarkedTokenStream<S>>::mark(input2)),
-            run,
+            *self,
             force_show_panics,
         )
         .map(|s| <Option<MarkedTokenStream<S>>>::unmark(s).unwrap_or_default())
     }
+}
+
+type SharedProcess = Arc<Mutex<StdioProcess>>;
+
+static STDIO_PROCESSES: OnceLock<Mutex<HashMap<PathBuf, SharedProcess>>> = OnceLock::new();
+
+thread_local! {
+    static ACTIVE_STDIO_PROCESSES: RefCell<Vec<PathBuf>> = const { RefCell::new(Vec::new()) };
+}
+
+struct ActiveProcess(PathBuf);
+
+impl ActiveProcess {
+    fn enter(path: &Path) -> Self {
+        ACTIVE_STDIO_PROCESSES.with_borrow_mut(|active| active.push(path.to_path_buf()));
+        ActiveProcess(path.to_path_buf())
+    }
+
+    fn contains(path: &Path) -> bool {
+        ACTIVE_STDIO_PROCESSES.with_borrow(|active| active.iter().any(|item| item == path))
+    }
+}
+
+impl Drop for ActiveProcess {
+    fn drop(&mut self) {
+        ACTIVE_STDIO_PROCESSES.with_borrow_mut(|active| {
+            assert_eq!(active.pop().as_deref(), Some(self.0.as_path()));
+        });
+    }
+}
+
+struct StdioProcess {
+    child: Child,
+    input: ChildStdin,
+    output: BufReader<ChildStdout>,
+}
+
+impl StdioProcess {
+    fn spawn(executable: &Path) -> io::Result<Self> {
+        let mut child = Command::new(executable)
+            .arg("--rustc-proc-macro-stdio")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()?;
+        let input = child.stdin.take().unwrap();
+        let output = BufReader::new(child.stdout.take().unwrap());
+        Ok(StdioProcess { child, input, output })
+    }
+
+    fn invoke<S: Server>(
+        &mut self,
+        dispatcher: &mut Dispatcher<S>,
+        input: Buffer,
+        index: u32,
+        force_show_panics: bool,
+    ) -> io::Result<Buffer> {
+        let mut payload = Vec::with_capacity(input.len() + 5);
+        payload.extend_from_slice(&index.to_le_bytes());
+        payload.push(u8::from(force_show_panics));
+        payload.extend_from_slice(&input);
+        write_stdio_frame(&mut self.input, STDIO_INVOKE, &payload)?;
+
+        let stdout = io::stdout();
+        let mut passthrough = stdout.lock();
+        loop {
+            let Some((kind, payload)) = read_stdio_frame(&mut self.output, Some(&mut passthrough))?
+            else {
+                let status = self.child.try_wait()?;
+                return Err(io::Error::other(match status {
+                    Some(status) => format!("server exited with {status}"),
+                    None => "server closed stdout".to_owned(),
+                }));
+            };
+            match kind {
+                STDIO_DISPATCH => {
+                    let response = dispatcher.dispatch(Buffer::from(payload));
+                    write_stdio_frame(&mut self.input, STDIO_RESPONSE, &response)?;
+                }
+                STDIO_RESULT => return Ok(Buffer::from(payload)),
+                _ => return Err(io::Error::other("server sent an unexpected frame")),
+            }
+        }
+    }
+}
+
+impl Drop for StdioProcess {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+fn run_stdio_client<S: Server>(
+    dispatcher: &mut Dispatcher<S>,
+    input: Buffer,
+    executable: &'static Path,
+    index: u32,
+    force_show_panics: bool,
+) -> Buffer {
+    let result = if ActiveProcess::contains(executable) {
+        StdioProcess::spawn(executable).and_then(|mut process| {
+            let _active = ActiveProcess::enter(executable);
+            process.invoke(dispatcher, input, index, force_show_panics)
+        })
+    } else {
+        let processes = STDIO_PROCESSES.get_or_init(|| Mutex::new(HashMap::new()));
+        let process = {
+            let mut processes = processes.lock().unwrap();
+            match processes.get(executable) {
+                Some(process) => Ok(process.clone()),
+                None => StdioProcess::spawn(executable).map(|process| {
+                    let process = Arc::new(Mutex::new(process));
+                    processes.insert(executable.to_path_buf(), process.clone());
+                    process
+                }),
+            }
+        };
+        process.and_then(|process| {
+            let _active = ActiveProcess::enter(executable);
+            let result =
+                process.lock().unwrap().invoke(dispatcher, input, index, force_show_panics);
+            result
+        })
+    };
+
+    result.unwrap_or_else(|error| {
+        let mut output = Buffer::new();
+        let error: Result<(), PanicMessage> = Err(PanicMessage::String(format!(
+            "procedural macro executable `{}` failed: {error}",
+            executable.display()
+        )));
+        error.encode(&mut output, &mut ());
+        output
+    })
 }

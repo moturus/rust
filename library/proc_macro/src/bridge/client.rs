@@ -1,13 +1,16 @@
 //! Client-side types.
 
 use std::cell::RefCell;
+use std::io::{self, BufReader};
 use std::ops::{Bound, Range};
+use std::path::Path;
 use std::sync::Once;
-use std::{fmt, mem, panic};
+use std::{fmt, mem, panic, process};
 
 use crate::bridge::{
     ApiTags, BridgeConfig, Buffer, Decode, Diagnostic, Encode, ExpnGlobals, Literal, PanicMessage,
-    TokenTree, closure, handle,
+    STDIO_DISPATCH, STDIO_INVOKE, STDIO_RESPONSE, STDIO_RESULT, TokenTree, closure, handle,
+    read_stdio_frame, write_stdio_frame,
 };
 
 pub(crate) struct TokenStream {
@@ -218,8 +221,9 @@ pub(crate) fn is_available() -> bool {
 /// result in a panic, it will not result in UB.
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub struct Client {
-    pub(super) run: extern "C" fn(BridgeConfig<'_>) -> Buffer,
+pub enum Client {
+    InProcess { run: extern "C" fn(BridgeConfig<'_>) -> Buffer },
+    Stdio { executable: &'static Path, index: u32 },
 }
 
 fn maybe_install_panic_hook(force_show_panics: bool) {
@@ -280,7 +284,7 @@ fn run_client<A: for<'a, 's> Decode<'a, 's, ()>>(
 
 impl Client {
     pub const fn expand1(f: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy) -> Self {
-        Client {
+        Client::InProcess {
             run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
                 run_client(bridge, f)
             }),
@@ -290,10 +294,63 @@ impl Client {
     pub const fn expand2(
         f: impl Fn(crate::TokenStream, crate::TokenStream) -> crate::TokenStream + Copy,
     ) -> Self {
-        Client {
+        Client::InProcess {
             run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
                 run_client(bridge, |(input, input2)| f(input, input2))
             }),
         }
     }
+
+    pub fn stdio(executable: &'static Path, index: usize) -> Self {
+        Client::Stdio { executable, index: index.try_into().unwrap() }
+    }
+}
+
+#[doc(hidden)]
+pub fn run_stdio_server(clients: &'static [Client]) -> ! {
+    if let Err(error) = run_stdio_server_inner(clients) {
+        eprintln!("procedural macro stdio server failed: {error}");
+        process::exit(101);
+    }
+    process::exit(0);
+}
+
+fn run_stdio_server_inner(clients: &'static [Client]) -> io::Result<()> {
+    let stdin = io::stdin();
+    let stdout = io::stdout();
+    let mut input = BufReader::new(stdin.lock());
+    let mut output = stdout.lock();
+
+    while let Some((kind, payload)) = read_stdio_frame(&mut input, None)? {
+        if kind != STDIO_INVOKE || payload.len() < 5 {
+            return Err(io::Error::other("expected an invocation frame"));
+        }
+        let index = u32::from_le_bytes(payload[..4].try_into().unwrap()) as usize;
+        let force_show_panics = payload[4] != 0;
+        let client = clients
+            .get(index)
+            .ok_or_else(|| io::Error::other("procedural macro index is out of range"))?;
+        let Client::InProcess { run } = *client else {
+            return Err(io::Error::other("nested external procedural macro client"));
+        };
+
+        let mut dispatch = |buffer: Buffer| -> Buffer {
+            write_stdio_frame(&mut output, STDIO_DISPATCH, &buffer)
+                .unwrap_or_else(|error| panic!("failed to send compiler request: {error}"));
+            let (kind, payload) = read_stdio_frame(&mut input, None)
+                .unwrap_or_else(|error| panic!("failed to read compiler response: {error}"))
+                .unwrap_or_else(|| panic!("compiler closed the procedural macro protocol"));
+            if kind != STDIO_RESPONSE {
+                panic!("compiler sent an unexpected procedural macro frame");
+            }
+            Buffer::from(payload)
+        };
+        let result = run(BridgeConfig {
+            input: Buffer::from(payload[5..].to_vec()),
+            dispatch: (&mut dispatch).into(),
+            force_show_panics,
+        });
+        write_stdio_frame(&mut output, STDIO_RESULT, &result)?;
+    }
+    Ok(())
 }
