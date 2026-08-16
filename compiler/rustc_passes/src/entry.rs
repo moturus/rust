@@ -6,6 +6,7 @@ use rustc_middle::query::Providers;
 use rustc_middle::ty::TyCtxt;
 use rustc_session::config::{CrateType, EntryFnType, sigpipe};
 use rustc_span::{RemapPathScopeComponents, Span};
+use rustc_target::spec::Os;
 
 use crate::diagnostics::{ExternMain, MultipleRustcMain, NoMainErr};
 
@@ -21,7 +22,8 @@ struct EntryContext<'tcx> {
 }
 
 fn entry_fn(tcx: TyCtxt<'_>, (): ()) -> Option<(DefId, EntryFnType)> {
-    let any_exe = tcx.crate_types().contains(&CrateType::Executable);
+    let any_exe = tcx.crate_types().contains(&CrateType::Executable)
+        || (tcx.sess.target.os == Os::Motor && tcx.crate_types().contains(&CrateType::ProcMacro));
     if !any_exe {
         // No need to find a main function.
         return None;

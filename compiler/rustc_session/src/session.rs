@@ -633,8 +633,9 @@ impl Session {
         #[allow(rustc::bad_opt_access)]
         if found_positive || found_negative {
             found_positive
-        } else if crate_type == Some(CrateType::ProcMacro)
-            || crate_type == None && self.opts.crate_types.contains(&CrateType::ProcMacro)
+        } else if self.target.os != rustc_target::spec::Os::Motor
+            && (crate_type == Some(CrateType::ProcMacro)
+                || crate_type == None && self.opts.crate_types.contains(&CrateType::ProcMacro))
         {
             // FIXME: When crate_type is not available,
             // we use compiler options to determine the crate_type.

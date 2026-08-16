@@ -33,7 +33,7 @@ use rustc_session::{Session, lint};
 use rustc_span::def_id::DefId;
 use rustc_span::edition::Edition;
 use rustc_span::{DUMMY_SP, Ident, Span, Symbol, sym};
-use rustc_target::spec::{PanicStrategy, Target};
+use rustc_target::spec::{Os, PanicStrategy, Target};
 use tracing::{debug, info};
 
 use crate::diagnostics;
@@ -636,16 +636,25 @@ impl CStore {
         )?;
 
         let raw_proc_macros = if crate_root.is_proc_macro_crate() {
-            let temp_root;
-            let (dlsym_source, dlsym_root) = match &host_lib {
-                Some(host_lib) => (&host_lib.source, {
-                    temp_root = host_lib.metadata.get_root();
-                    &temp_root
-                }),
-                None => (&source, &crate_root),
+            let (dlsym_source, dlsym_metadata) = match &host_lib {
+                Some(host_lib) => (&host_lib.source, &host_lib.metadata),
+                None => (&source, &metadata),
             };
             let dlsym_dylib = dlsym_source.dylib.as_ref().expect("no dylib for a proc-macro crate");
-            Some(self.dlsym_proc_macros(dlsym_dylib, dlsym_root.stable_crate_id())?)
+            if tcx.sess.host.os == Os::Motor {
+                let executable = Box::leak(dlsym_dylib.clone().into_boxed_path());
+                let clients = (0..dlsym_metadata.get_proc_macro_info().len())
+                    .map(|index| ProcMacroClient::stdio(executable, index))
+                    .collect::<Vec<_>>();
+                Some(&*Box::leak(clients.into_boxed_slice()))
+            } else {
+                Some(
+                    self.dlsym_proc_macros(
+                        dlsym_dylib,
+                        dlsym_metadata.get_root().stable_crate_id(),
+                    )?,
+                )
+            }
         } else {
             None
         };
