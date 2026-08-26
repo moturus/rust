@@ -1009,9 +1009,10 @@ dependencies = [
 [[package]]
 name = "ctrlc"
 version = "3.5.1"
-source = "git+https://github.com/moturus/rust-ctrlc.git?branch=motor-os-rustc#622a7064379ff01ffc924348b349d25c2bead8f5"
+source = "git+https://github.com/moturus/rust-ctrlc.git?branch=motor-os-rustc#39ec5cf4cbf9ec8bc21c4d40c881fa0fa2936b9f"
 dependencies = [
  "dispatch2",
+ "moto-rt",
  "nix",
  "windows-sys 0.61.2",
 ]
@@ -2581,6 +2582,12 @@ dependencies = [
 [[package]]
 name = "miropt-test-tools"
 version = "0.1.0"
+
+[[package]]
+name = "moto-rt"
+version = "0.17.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d957efc93bb603844e45d66f45c9b999168ff8f7630da91f3a7308c498a7ccc"
 
 [[package]]
 name = "munge"
