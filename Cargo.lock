@@ -2283,8 +2283,8 @@ checksum = "803ec87c9cfb29b9d2633f20cba1f488db3fd53f2158b1024cbefb47ba05d413"
 
 [[package]]
 name = "libc"
-version = "0.2.186"
-source = "git+https://github.com/moturus/libc.git?branch=motor-os-rustc#e544064485e9b98dc52bd50476a48471323e40b4"
+version = "0.2.186+motor.1"
+source = "git+https://github.com/moturus/libc.git?rev=22836a72e660c7000b1b00db2f0a345fff4e52b6#22836a72e660c7000b1b00db2f0a345fff4e52b6"
 
 [[package]]
 name = "libffi"
@@ -2320,18 +2320,8 @@ dependencies = [
 
 [[package]]
 name = "libloading"
-version = "0.8.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
-dependencies = [
- "cfg-if",
- "windows-link 0.2.1",
-]
-
-[[package]]
-name = "libloading"
-version = "0.9.0"
-source = "git+https://github.com/moturus/rust_libloading.git?branch=motor-os-rustc#85e74242807f1b0a5bbbea912adea6e60547a7e8"
+version = "0.9.0+motor.1"
+source = "git+https://github.com/moturus/rust_libloading.git?rev=fb65a92af40bb114deee370ecf4164be74c3fb65#fb65a92af40bb114deee370ecf4164be74c3fb65"
 dependencies = [
  "cfg-if",
  "windows-link 0.2.1",
@@ -2565,7 +2555,7 @@ dependencies = [
  "ipc-channel",
  "libc",
  "libffi",
- "libloading 0.9.0",
+ "libloading",
  "measureme",
  "mio",
  "nix",
@@ -3194,7 +3184,7 @@ dependencies = [
 [[package]]
 name = "psm"
 version = "0.1.26"
-source = "git+https://github.com/moturus/stacker.git?branch=motor-os-rustc#426b6a5af4a1da12026fcc2e8ecdb76a18850ac0"
+source = "git+https://github.com/moturus/stacker.git?rev=426b6a5af4a1da12026fcc2e8ecdb76a18850ac0#426b6a5af4a1da12026fcc2e8ecdb76a18850ac0"
 dependencies = [
  "cc",
 ]
@@ -3813,7 +3803,7 @@ dependencies = [
  "gimli 0.33.0",
  "itertools",
  "libc",
- "libloading 0.9.0",
+ "libloading",
  "measureme",
  "object 0.38.1",
  "rustc-demangle",
@@ -4396,7 +4386,7 @@ version = "0.0.0"
 dependencies = [
  "bitflags",
  "libc",
- "libloading 0.8.9",
+ "libloading",
  "odht",
  "rustc_abi",
  "rustc_ast",
@@ -5437,7 +5427,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 [[package]]
 name = "stacker"
 version = "0.1.21"
-source = "git+https://github.com/moturus/stacker.git?branch=motor-os-rustc#426b6a5af4a1da12026fcc2e8ecdb76a18850ac0"
+source = "git+https://github.com/moturus/stacker.git?rev=426b6a5af4a1da12026fcc2e8ecdb76a18850ac0#426b6a5af4a1da12026fcc2e8ecdb76a18850ac0"
 dependencies = [
  "cc",
  "cfg-if",

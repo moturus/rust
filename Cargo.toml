@@ -101,8 +101,9 @@ codegen-units = 1
 #
 # libloading: mlibc ships dlopen/dlsym stubs that fail gracefully at runtime —
 # proc macros and dylib codegen backends are unsupported on a static-only OS.
-# The compiler is on a single libloading version (0.9); rustc_metadata was
-# bumped off 0.8 for that.
+# The compiler is on a single libloading version (0.9); the Motor fork uses
+# build metadata so Rust's multi-workspace license vendoring can distinguish it
+# from the upstream 0.9.0 package.
 #
 # getrandom needs no fork: upstream supports Motor OS since 0.4.3, and the
 # compiler's only getrandom route for the motor target is rand 0.10+.
@@ -111,10 +112,11 @@ codegen-units = 1
 # moto-rt needs no patch here: std pulls it from crates.io (>= 0.17.0, which
 # carries the weak mem* symbols so mlibc's strong ones win).
 [patch.crates-io]
-libloading = { git = "https://github.com/moturus/rust_libloading.git", branch = "motor-os-rustc" }
+libloading = { git = "https://github.com/moturus/rust_libloading.git", rev = "fb65a92af40bb114deee370ecf4164be74c3fb65" }
 # stacker: use the alloc-based stack guard on Motor (no file/anon mmap).
-stacker = { git = "https://github.com/moturus/stacker.git", branch = "motor-os-rustc" }
-# libc 0.2 series with the Motor OS module.
-libc = { git = "https://github.com/moturus/libc.git", branch = "motor-os-rustc" }
-# ctrlc: Motor OS platform stub (no signals; waiter parks forever).
+stacker = { git = "https://github.com/moturus/stacker.git", rev = "426b6a5af4a1da12026fcc2e8ecdb76a18850ac0" }
+# libc 0.2 series with the Motor OS module and a distinct package version for
+# multi-workspace license vendoring.
+libc = { git = "https://github.com/moturus/libc.git", rev = "22836a72e660c7000b1b00db2f0a345fff4e52b6" }
+# ctrlc: native Motor OS Ctrl-C notification through moto-rt.
 ctrlc = { git = "https://github.com/moturus/rust-ctrlc.git", branch = "motor-os-rustc" }
