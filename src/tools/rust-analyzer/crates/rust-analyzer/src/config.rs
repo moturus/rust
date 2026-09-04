@@ -1182,12 +1182,19 @@ impl std::ops::Deref for Config {
 impl Config {
     /// Path to the user configuration dir. This can be seen as a generic way to define what would be `$XDG_CONFIG_HOME/rust-analyzer` in Linux.
     pub fn user_config_dir_path() -> Option<AbsPathBuf> {
-        let user_config_path = if let Some(path) = env::var_os("__TEST_RA_USER_CONFIG_DIR") {
-            std::path::PathBuf::from(path)
-        } else {
-            dirs::config_dir()?.join("rust-analyzer")
-        };
-        Some(AbsPathBuf::assert_utf8(user_config_path))
+        #[cfg(target_os = "motor")]
+        {
+            None
+        }
+        #[cfg(not(target_os = "motor"))]
+        {
+            let user_config_path = if let Some(path) = env::var_os("__TEST_RA_USER_CONFIG_DIR") {
+                std::path::PathBuf::from(path)
+            } else {
+                dirs::config_dir()?.join("rust-analyzer")
+            };
+            Some(AbsPathBuf::assert_utf8(user_config_path))
+        }
     }
 
     pub fn same_source_root_parent_map(

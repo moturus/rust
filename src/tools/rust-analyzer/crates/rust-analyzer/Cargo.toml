@@ -23,7 +23,6 @@ path = "src/bin/main.rs"
 anyhow.workspace = true
 base64 = "0.22"
 crossbeam-channel.workspace = true
-dirs = "6.0.0"
 dissimilar.workspace = true
 ide-completion.workspace = true
 indexmap.workspace = true
@@ -76,6 +75,9 @@ vfs.workspace = true
 paths.workspace = true
 
 ra-ap-rustc_type_ir.workspace = true
+
+[target.'cfg(not(target_os = "motor"))'.dependencies]
+dirs = "6.0.0"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
