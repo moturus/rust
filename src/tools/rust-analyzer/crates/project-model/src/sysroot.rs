@@ -259,7 +259,7 @@ impl Sysroot {
         };
         if let RustSourceWorkspaceConfig::CargoMetadata(cargo_config) = sysroot_source_config {
             let library_manifest = ManifestPath::try_from(src_root.join("Cargo.toml")).unwrap();
-            if fs::metadata(&library_manifest).is_ok() {
+            if cfg!(not(target_os = "motor")) && fs::metadata(&library_manifest).is_ok() {
                 match self.load_library_via_cargo(
                     &library_manifest,
                     src_root,
