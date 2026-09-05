@@ -25,6 +25,8 @@ use crate::utils::exec::{BootstrapCommand, command};
 use crate::utils::helpers::{self, add_dylib_path, exe, t};
 use crate::{Compiler, FileType, Mode};
 
+mod motor_rust_analyzer;
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum SourceType {
     InTree,
@@ -198,6 +200,11 @@ pub fn prepare_tool_cargo(
     let path = PathBuf::from(path);
     let dir = builder.src.join(&path);
     cargo.arg("--manifest-path").arg(dir.join("Cargo.toml"));
+
+    let motor_config = env::var_os("MOTOR_RUST_ANALYZER_CARGO_CONFIG");
+    if let Some(args) = motor_rust_analyzer::cargo_config_args(&path, motor_config.as_deref()) {
+        cargo.args(args);
+    }
 
     let mut features = extra_features.to_vec();
     if builder.build.config.cargo_native_static {
