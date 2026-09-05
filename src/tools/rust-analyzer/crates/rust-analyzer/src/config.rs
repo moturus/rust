@@ -3,7 +3,7 @@
 //! Of particular interest is the `feature_flags` hash map: while other fields
 //! configure the server itself, feature flags are passed into analysis, and
 //! tweak things like automatic insertion of `()` in completions.
-use std::{env, fmt, iter, ops::Not, sync::OnceLock};
+use std::{fmt, iter, ops::Not, sync::OnceLock};
 
 use cfg::{CfgAtom, CfgDiff};
 use hir::Symbol;
@@ -1188,7 +1188,8 @@ impl Config {
         }
         #[cfg(not(target_os = "motor"))]
         {
-            let user_config_path = if let Some(path) = env::var_os("__TEST_RA_USER_CONFIG_DIR") {
+            let user_config_path = if let Some(path) = std::env::var_os("__TEST_RA_USER_CONFIG_DIR")
+            {
                 std::path::PathBuf::from(path)
             } else {
                 dirs::config_dir()?.join("rust-analyzer")

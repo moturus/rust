@@ -10,6 +10,11 @@ use std::{
 
 use crate::JodChild;
 
+#[cfg_attr(any(unix, windows, target_arch = "wasm32"), allow(dead_code))]
+mod portable;
+#[cfg(not(any(unix, windows, target_arch = "wasm32")))]
+use portable as imp;
+
 pub fn streaming_output(
     out: ChildStdout,
     err: ChildStderr,
