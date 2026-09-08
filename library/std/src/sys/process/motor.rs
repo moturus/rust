@@ -214,8 +214,108 @@ impl From<io::Stderr> for Stdio {
 }
 
 impl fmt::Debug for Command {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if f.alternate() {
+            let mut command = f.debug_struct("Command");
+            command.field("program", &self.get_program()).field("args", &self.get_args());
+            if self.get_env_clear() || self.get_envs().next().is_some() {
+                command.field("env_clear", &self.get_env_clear()).field("env", &self.get_envs());
+            }
+            if let Some(cwd) = self.get_current_dir() {
+                command.field("cwd", &cwd);
+            }
+            return command.finish();
+        }
+
+        if let Some(cwd) = self.get_current_dir() {
+            write!(f, "cd {cwd:?} && ")?;
+        }
+        if self.get_env_clear() {
+            write!(f, "env -i ")?;
+        } else {
+            let mut removed = false;
+            for (key, value) in self.get_envs() {
+                if value.is_none() {
+                    if !removed {
+                        write!(f, "env ")?;
+                        removed = true;
+                    }
+                    write!(f, "-u {} ", key.to_string_lossy())?;
+                }
+            }
+        }
+        for (key, value) in self.get_envs() {
+            if let Some(value) = value {
+                write!(f, "{}={value:?} ", key.to_string_lossy())?;
+            }
+        }
+        write!(f, "{:?}", self.get_program())?;
+        for arg in self.get_args() {
+            write!(f, " {arg:?}")?;
+        }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod command_debug_tests {
+    use super::*;
+
+    #[test]
+    fn program_and_escaped_arguments() {
+        let mut command = Command::new(OsStr::new("/path with spaces/工具"));
+        for arg in ["", "a\"b", "line\nnext", "back\\slash"] {
+            command.arg(OsStr::new(arg));
+        }
+        assert_eq!(
+            format!("{command:?}"),
+            "\"/path with spaces/工具\" \"\" \"a\\\"b\" \"line\\nnext\" \"back\\\\slash\""
+        );
+    }
+
+    #[test]
+    fn cwd_and_environment_changes() {
+        let mut command = Command::new(OsStr::new("tool"));
+        command.cwd(OsStr::new("/some path"));
+        command.env_mut().set(OsStr::new("SET"), OsStr::new("two words"));
+        command.env_mut().remove(OsStr::new("REMOVE"));
+        assert_eq!(
+            format!("{command:?}"),
+            "cd \"/some path\" && env -u REMOVE SET=\"two words\" \"tool\""
+        );
+        command.env_mut().clear();
+        command.env_mut().set(OsStr::new("SET"), OsStr::new("value"));
+        assert_eq!(format!("{command:?}"), "cd \"/some path\" && env -i SET=\"value\" \"tool\"");
+    }
+
+    #[test]
+    fn alternate_format_has_structured_fields() {
+        let mut command = Command::new(OsStr::new("tool"));
+        command.arg(OsStr::new("argument"));
+        let plain = format!("{command:#?}");
+        assert!(plain.starts_with("Command {\n"));
+        assert!(plain.contains("program: \"tool\""));
+        assert!(plain.contains("args: [\n"));
+        assert!(plain.contains("\"argument\""));
+        assert!(!plain.contains("env_clear:"));
+        command.env_mut().clear();
+        command.cwd(OsStr::new("/project"));
+        let changed = format!("{command:#?}");
+        assert!(changed.contains("env_clear: true"));
+        assert!(changed.contains("cwd: \"/project\""));
+    }
+
+    #[test]
+    fn propagates_formatter_errors() {
+        struct Reject;
+        impl fmt::Write for Reject {
+            fn write_str(&mut self, _: &str) -> fmt::Result {
+                Err(fmt::Error)
+            }
+        }
+        let command = Command::new(OsStr::new("tool"));
+        assert!(fmt::write(&mut Reject, format_args!("{command:?}")).is_err());
+        assert!(fmt::write(&mut Reject, format_args!("{command:#?}")).is_err());
     }
 }
 
