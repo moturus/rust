@@ -14,6 +14,9 @@
 #[cfg(not(all(windows, target_env = "msvc")))]
 extern crate libc as _;
 
+#[cfg(target_os = "motor")]
+extern crate unwinding as _;
+
 cfg_select! {
     target_env = "msvc" => {
         // Windows MSVC no extra unwinder support needed
@@ -34,6 +37,7 @@ cfg_select! {
         all(target_vendor = "fortanix", target_env = "sgx"),
         all(target_os = "wasi", panic = "unwind"),
         target_os = "xous",
+        target_os = "motor",
     ) => {
         mod libunwind;
         pub use libunwind::*;
@@ -48,7 +52,6 @@ cfg_select! {
         // no unwinder on the system!
         // - os=none ("bare metal" targets)
         // - os=hermit
-        // - os=motor
         // - os=uefi
         // - os=cuda
         // - nvptx64-nvidia-cuda
