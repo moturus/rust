@@ -2,8 +2,8 @@
 
 use core::ffi::{c_int, c_void};
 
-// Use the unwinding crate as unwinder on Xous
-#[cfg(target_os = "xous")]
+// Use the unwinding crate as unwinder on Xous and Motor OS.
+#[cfg(any(target_os = "xous", target_os = "motor"))]
 pub use unwinding::custom_eh_frame_finder::{
     EhFrameFinder, FrameInfo, FrameInfoKind, set_custom_eh_frame_finder,
 };
