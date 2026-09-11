@@ -3,6 +3,9 @@
 use crate::io;
 use crate::vec::Vec;
 
+#[cfg(all(not(test), feature = "panic-unwind"))]
+mod eh_frame;
+
 pub(crate) fn map_motor_error(err: moto_rt::Error) -> io::Error {
     let error_code: moto_rt::ErrorCode = err.into();
     io::Error::from_raw_os_error(error_code.into())
@@ -49,7 +52,10 @@ pub extern "C" fn motor_start() -> ! {
 
 // SAFETY: must be called only once during runtime initialization.
 // NOTE: Motor OS uses moto_rt::start() to initialize runtime (see above).
-pub unsafe fn init(_argc: isize, _argv: *const *const u8, _sigpipe: u8) {}
+pub unsafe fn init(_argc: isize, _argv: *const *const u8, _sigpipe: u8) {
+    #[cfg(all(not(test), feature = "panic-unwind"))]
+    eh_frame::register();
+}
 
 // SAFETY: must be called only once during runtime cleanup.
 // NOTE: this is not guaranteed to run, for example when the program aborts.
