@@ -1,6 +1,4 @@
-use crate::spec::{
-    Cc, FramePointer, LinkerFlavor, Lld, Os, PanicStrategy, StackProbeType, TargetOptions,
-};
+use crate::spec::{Cc, FramePointer, LinkerFlavor, Lld, Os, StackProbeType, TargetOptions};
 
 pub(crate) fn opts() -> TargetOptions {
     let pre_link_args = TargetOptions::link_args(
@@ -17,7 +15,6 @@ pub(crate) fn opts() -> TargetOptions {
         frame_pointer: FramePointer::NonLeaf,
         linker_flavor: LinkerFlavor::Gnu(Cc::Yes, Lld::No),
         main_needs_argc_argv: true,
-        panic_strategy: PanicStrategy::Abort,
         pre_link_args,
         stack_probes: StackProbeType::Inline,
         supports_stack_protector: true,
