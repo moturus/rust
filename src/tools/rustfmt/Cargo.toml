@@ -42,7 +42,6 @@ cargo_metadata = "0.23"
 clap = { version = "4.4.2", features = ["derive"] }
 clap-cargo = "0.18.3"
 diff = "0.1"
-dirs = "6.0"
 getopts = "0.2"
 ignore = "0.4"
 itertools = "0.15"
@@ -60,6 +59,10 @@ unicode-properties = { version = "0.1", default-features = false, features = ["g
 
 rustfmt-config_proc_macro = { version = "0.3", path = "config_proc_macro" }
 semver = "1.0.21"
+
+# Motor OS resolves the user configuration directories in src/config/mod.rs.
+[target.'cfg(not(target_os = "motor"))'.dependencies]
+dirs = "6.0"
 
 [dev-dependencies]
 tempfile = "3.23.0"

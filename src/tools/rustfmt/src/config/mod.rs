@@ -380,14 +380,14 @@ impl Config {
             }
 
             // If nothing was found, check in the home directory.
-            if let Some(home_dir) = dirs::home_dir() {
+            if let Some(home_dir) = user_home_dir() {
                 if let Some(path) = get_toml_path(&home_dir)? {
                     return Ok(Some(path));
                 }
             }
 
             // If none was found there either, check in the user's configuration directory.
-            if let Some(mut config_dir) = dirs::config_dir() {
+            if let Some(mut config_dir) = user_config_dir() {
                 config_dir.push("rustfmt");
                 if let Some(path) = get_toml_path(&config_dir)? {
                     return Ok(Some(path));
@@ -517,6 +517,28 @@ fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
         }
     }
     Ok(None)
+}
+
+// The user's home and configuration directories, consulted after the project
+// tree. Motor OS has fixed per-user locations instead of HOME and XDG variables.
+#[cfg(not(target_os = "motor"))]
+fn user_home_dir() -> Option<PathBuf> {
+    dirs::home_dir()
+}
+
+#[cfg(not(target_os = "motor"))]
+fn user_config_dir() -> Option<PathBuf> {
+    dirs::config_dir()
+}
+
+#[cfg(target_os = "motor")]
+fn user_home_dir() -> Option<PathBuf> {
+    Some(PathBuf::from("/user"))
+}
+
+#[cfg(target_os = "motor")]
+fn user_config_dir() -> Option<PathBuf> {
+    Some(PathBuf::from("/user/cfg"))
 }
 
 fn config_path(options: &dyn CliOptions) -> Result<Option<PathBuf>, Error> {
