@@ -1157,6 +1157,7 @@ impl CommandLineStep for Rustc {
             target,
         );
         let stamp = build_stamp::librustc_stamp(builder, build_compiler, target);
+        let keep_all_rlibs = target.triple == "x86_64-unknown-motor";
 
         run_cargo(
             builder,
@@ -1164,8 +1165,11 @@ impl CommandLineStep for Rustc {
             vec![],
             &stamp,
             vec![],
-            ArtifactKeepMode::Custom(Box::new(|filename| {
-                if filename.contains("jemalloc_sys")
+            ArtifactKeepMode::Custom(Box::new(move |filename| {
+                if keep_all_rlibs {
+                    // Motor cannot use librustc_driver.so, so rustc_private tools need every rlib.
+                    filename.ends_with(".rlib")
+                } else if filename.contains("jemalloc_sys")
                     || filename.contains("rustc_public_bridge")
                     || filename.contains("rustc_public")
                 {
