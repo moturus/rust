@@ -434,10 +434,7 @@ impl DirEntry {
     }
 
     pub fn path(&self) -> PathBuf {
-        let mut path = self.parent_path.clone();
-        path.push_str("/");
-        path.push_str(self.filename());
-        path.into()
+        Path::new(&self.parent_path).join(self.filename())
     }
 
     pub fn file_name(&self) -> OsString {
