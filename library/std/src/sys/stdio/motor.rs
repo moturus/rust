@@ -89,8 +89,8 @@ pub fn panic_output() -> Option<impl io::Write> {
     Some(Stderr::new())
 }
 
-pub fn is_ebadf(_err: &io::Error) -> bool {
-    true
+pub fn is_ebadf(err: &io::Error) -> bool {
+    err.raw_os_error() == Some(moto_rt::E_BAD_HANDLE.into())
 }
 
 #[stable(feature = "process_extensions", since = "1.2.0")]
