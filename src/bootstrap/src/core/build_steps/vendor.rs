@@ -2,6 +2,7 @@
 //!
 //! This module ensures that all required Cargo dependencies are gathered
 //! and stored in the `<src>/<VENDOR_DIR>` directory.
+use std::env;
 use std::path::PathBuf;
 
 use crate::core::build_steps::tool::SUBMODULES_FOR_RUSTBOOK;
@@ -87,11 +88,20 @@ impl CommandLineStep for Vendor {
     fn run(self, builder: &Builder<'_>) -> Self::Output {
         let _guard = builder.group(&format!("Vendoring sources to {:?}", self.root_dir));
 
+        // Motor: the rust-analyzer lockfile resolves two crates to patched sources that only
+        // its workspace-scoped Cargo config names. Vendor it alone with that config, and never
+        // let a Motor build re-resolve a lockfile.
+        let motor_config = env::var_os("MOTOR_RUST_ANALYZER_CARGO_CONFIG");
+        let analyzer = builder.src.join("src/tools/rust-analyzer/Cargo.toml");
+
         let config = if self.only_library_workspace {
             String::new()
         } else {
             let mut cmd = command(&builder.initial_cargo);
             cmd.arg("vendor");
+            if motor_config.is_some() {
+                cmd.arg("--locked");
+            }
 
             if self.versioned_dirs {
                 cmd.arg("--versioned-dirs");
@@ -107,7 +117,9 @@ impl CommandLineStep for Vendor {
 
             // Sync these paths by default.
             for (p, _) in &to_vendor {
-                cmd.arg("--sync").arg(p);
+                if motor_config.is_none() || *p != analyzer {
+                    cmd.arg("--sync").arg(p);
+                }
             }
 
             // Also sync explicitly requested paths.
@@ -133,11 +145,39 @@ impl CommandLineStep for Vendor {
                 Some(output_dir) => cmd.arg(output_dir.join(VENDOR_DIR)),
             };
 
-            cmd.run_capture_stdout(builder).stdout()
+            let config = cmd.run_capture_stdout(builder).stdout();
+
+            if let Some(motor_config) = &motor_config {
+                // `--no-delete` keeps what the run above vendored.
+                let mut cmd = command(&builder.initial_cargo);
+                cmd.args(["vendor", "--locked", "--no-delete"]);
+                if self.versioned_dirs {
+                    cmd.arg("--versioned-dirs");
+                }
+                if builder.config.vendor {
+                    cmd.arg("--respect-source-config")
+                        .arg("--config")
+                        .arg(builder.src.join(".cargo").join("config.toml"));
+                }
+                cmd.arg("--config").arg(motor_config).arg("--manifest-path").arg(&analyzer);
+                cmd.env("RUSTC_BOOTSTRAP", "1");
+                cmd.env("RUSTC", &builder.initial_rustc);
+                cmd.current_dir(&self.root_dir);
+                match &self.output_dir {
+                    None => cmd.arg(VENDOR_DIR),
+                    Some(output_dir) => cmd.arg(output_dir.join(VENDOR_DIR)),
+                };
+                cmd.run_capture_stdout(builder);
+            }
+
+            config
         };
 
         let mut cmd = command(&builder.initial_cargo);
         cmd.arg("vendor");
+        if motor_config.is_some() {
+            cmd.arg("--locked");
+        }
 
         if self.versioned_dirs {
             cmd.arg("--versioned-dirs");

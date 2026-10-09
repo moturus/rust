@@ -37,6 +37,8 @@ pub struct PackageMetadata {
     pub notices: BTreeMap<String, String>,
     /// If this is true, this dep is in the Rust Standard Library
     pub is_in_libstd: Option<bool>,
+    /// Motor: the directory of a path package outside the tree, which is not vendored
+    pub local_dir: Option<PathBuf>,
 }
 
 /// Use `cargo metadata` to get a list of dependencies and their license data. License files will
@@ -72,6 +74,9 @@ pub fn get_metadata(
     manifest_paths: &[PathBuf],
 ) -> Result<BTreeMap<Package, PackageMetadata>, Error> {
     let mut output = BTreeMap::new();
+    let motor_config = std::env::var_os("MOTOR_RUST_ANALYZER_CARGO_CONFIG").map(|config| {
+        config.into_string().expect("MOTOR_RUST_ANALYZER_CARGO_CONFIG must be UTF-8")
+    });
     // Look at the metadata for each manifest
     for manifest_path in manifest_paths {
         if manifest_path.file_name() != Some(OsStr::new("Cargo.toml")) {
@@ -81,6 +86,7 @@ pub fn get_metadata(
             .cargo_path(cargo)
             .env("RUSTC_BOOTSTRAP", "1")
             .manifest_path(manifest_path)
+            .other_options(motor_cargo_options(manifest_path, root_path, motor_config.as_deref()))
             .exec()?;
         for package in metadata.packages {
             let package_manifest_path = package.manifest_path.as_path();
@@ -92,6 +98,10 @@ pub fn get_metadata(
                 continue;
             }
             // otherwise it's an out-of-tree dependency
+            let local_dir = match package.source {
+                None => package_manifest_path.parent().map(|dir| dir.as_std_path().to_path_buf()),
+                Some(_) => None,
+            };
             let package_id =
                 Package { name: package.name.to_string(), version: package.version.to_string() };
             output.insert(
@@ -101,12 +111,26 @@ pub fn get_metadata(
                     authors: package.authors,
                     notices: BTreeMap::new(),
                     is_in_libstd: None,
+                    local_dir,
                 },
             );
         }
     }
 
     Ok(output)
+}
+
+/// Motor: a Motor build never re-resolves a lockfile, and only rust-analyzer gets its
+/// workspace-scoped patches.
+fn motor_cargo_options(manifest: &Path, root: &Path, config: Option<&str>) -> Vec<String> {
+    let Some(config) = config else {
+        return Vec::new();
+    };
+    let mut options = vec![String::from("--locked")];
+    if manifest == root.join("src/tools/rust-analyzer/Cargo.toml") {
+        options.extend([String::from("--config"), config.to_string()]);
+    }
+    options
 }
 
 /// Add important files off disk into this dependency.
@@ -120,7 +144,7 @@ fn load_important_files(
 ) -> Result<(), Error> {
     let name_version = format!("{}-{}", package.name, package.version);
     println!("Scraping notices for {}...", name_version);
-    let dep_vendor_path = vendor_root.join(name_version);
+    let dep_vendor_path = dep.local_dir.clone().unwrap_or_else(|| vendor_root.join(name_version));
     for entry in std::fs::read_dir(dep_vendor_path)? {
         let entry = entry?;
         let metadata = entry.metadata()?;
@@ -161,4 +185,30 @@ fn load_important_files(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unset_config_leaves_cargo_metadata_unchanged() {
+        let root = Path::new("/src");
+        let analyzer = root.join("src/tools/rust-analyzer/Cargo.toml");
+        assert!(motor_cargo_options(&analyzer, root, None).is_empty());
+    }
+
+    #[test]
+    fn every_workspace_is_locked_and_only_the_analyzer_is_patched() {
+        let root = Path::new("/src");
+        let config = "/external state/patches.toml";
+        for manifest in ["Cargo.toml", "src/tools/cargo/Cargo.toml", "library/Cargo.toml"] {
+            assert_eq!(motor_cargo_options(&root.join(manifest), root, Some(config)), ["--locked"]);
+        }
+        let analyzer = root.join("src/tools/rust-analyzer/Cargo.toml");
+        assert_eq!(
+            motor_cargo_options(&analyzer, root, Some(config)),
+            ["--locked", "--config", config]
+        );
+    }
 }
