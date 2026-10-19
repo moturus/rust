@@ -2575,9 +2575,9 @@ version = "0.1.0"
 
 [[package]]
 name = "moto-rt"
-version = "0.17.5"
+version = "0.17.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d957efc93bb603844e45d66f45c9b999168ff8f7630da91f3a7308c498a7ccc"
+checksum = "4d8ec4efe5d19efe27a3457f7fabf6a9a68f4ea51b8bc21f7ec494f27e74d1ec"
 
 [[package]]
 name = "munge"
