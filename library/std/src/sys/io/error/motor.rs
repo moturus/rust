@@ -53,6 +53,7 @@ pub fn decode_error_kind(code: io::RawOsError) -> io::ErrorKind {
         moto_rt::Error::ConnectionReset => io::ErrorKind::ConnectionReset,
         moto_rt::Error::StorageFull => io::ErrorKind::StorageFull,
         moto_rt::Error::InvalidData => io::ErrorKind::InvalidData,
+        moto_rt::Error::CrossesDevices => io::ErrorKind::CrossesDevices,
         _ => io::ErrorKind::Uncategorized,
     }
 }
